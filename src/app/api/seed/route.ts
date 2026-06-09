@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 
+export async function GET() {
+  return POST()
+}
+
 export async function POST() {
   const users = [
     { name: 'Director', email: 'director@samdesk.in', password: 'Director@123', role: 'director' },

@@ -7,7 +7,7 @@ import {
   ArrowLeft, CheckSquare, Clock, FileText, Plus,
   Flame, Thermometer, Snowflake, ChevronRight,
   Activity, DollarSign, Factory, User, Calendar,
-  MessageSquare, Phone, AlertCircle, Check, X
+  MessageSquare, Phone, AlertCircle, Check, X, Download
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -15,6 +15,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { formatCurrency, formatDate, getStageColor, getStageLabel, STAGES, PRODUCTION_STAGES } from '@/lib/utils'
+import { generateQuote } from '@/lib/generateQuote'
+import { generatePI } from '@/lib/generatePI'
 
 interface Deal {
   id: string
@@ -284,6 +286,7 @@ export default function DealDetailPage() {
           <TabsTrigger value="tasks">Tasks ({pendingTasks.length})</TabsTrigger>
           <TabsTrigger value="production">Production</TabsTrigger>
           <TabsTrigger value="payments">Payments</TabsTrigger>
+          <TabsTrigger value="documents">Documents</TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
@@ -559,6 +562,67 @@ export default function DealDetailPage() {
               ))}
             </div>
           )}
+        </TabsContent>
+        {/* Documents Tab */}
+        <TabsContent value="documents" className="mt-4">
+          <Card>
+            <CardHeader><CardTitle className="text-sm">Document Generation</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-col gap-3">
+                <div className="flex items-start gap-4 p-4 rounded-lg border border-gray-200 bg-white">
+                  <FileText className="w-8 h-8 text-blue-500 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-900">Quotation</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Generate a quote PDF in SAM PRODUCTS format with technical specifications and pricing.</p>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => generateQuote(deal)}
+                    className="flex items-center gap-1.5"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    Generate Quote
+                  </Button>
+                </div>
+
+                {(STAGE_FLOW.indexOf(deal.stage) >= STAGE_FLOW.indexOf('pi_sent') || deal.stage === 'pi_sent') && (
+                  <div className="flex items-start gap-4 p-4 rounded-lg border border-gray-200 bg-white">
+                    <FileText className="w-8 h-8 text-green-500 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-900">Proforma Invoice (PI)</p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Generate a PI with {deal.customerState === 'Uttar Pradesh' ? 'CGST + SGST (9% + 9%)' : 'IGST (18%)'} — HSN 84145930.
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => generatePI(deal)}
+                      className="flex items-center gap-1.5"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      Generate PI
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {deal.documents && deal.documents.length > 0 && (
+                <div className="mt-4">
+                  <p className="text-xs text-gray-500 mb-2">Existing Documents</p>
+                  <div className="space-y-2">
+                    {deal.documents.map((doc: any) => (
+                      <div key={doc.id} className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 border border-gray-200">
+                        <FileText className="w-4 h-4 text-gray-400" />
+                        <span className="text-sm text-gray-700 flex-1">{doc.name || doc.type}</span>
+                        <span className="text-xs text-gray-400">{formatDate(doc.createdAt)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

@@ -1,7 +1,6 @@
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
-// Colors
 const BLUE: [number, number, number] = [0, 112, 192]
 const YELLOW: [number, number, number] = [255, 192, 0]
 const RED: [number, number, number] = [255, 0, 0]
@@ -26,11 +25,8 @@ export function generateQuote(deal: any): void {
   const contentW = pageW - 2 * margin
   let y = 10
 
-  // ── HEADER ──────────────────────────────────────────────────────────────────
-  // Blue top bar
   doc.setFillColor(...BLUE)
   doc.rect(0, 0, pageW, 22, 'F')
-
   doc.setTextColor(...WHITE)
   doc.setFontSize(18)
   doc.setFont('helvetica', 'bold')
@@ -38,38 +34,29 @@ export function generateQuote(deal: any): void {
   doc.setFontSize(9)
   doc.setFont('helvetica', 'normal')
   doc.text('SINCE 1992', margin, 18)
-
-  // Right side of header
   doc.setFontSize(7.5)
   doc.text('B-137, Noida Rd, B Block, Sector 6, Noida, 201301, U.P., INDIA', pageW - margin, 8, { align: 'right' })
   doc.text('Ph: 9810065139  |  samproducts1992@gmail.com  |  samproducts25@gmail.com', pageW - margin, 13, { align: 'right' })
   doc.text('www.samproducts.net  |  GSTIN: 09AAKCS6327D1Z8  |  CIN: U51101UP2007PTC055433', pageW - margin, 18, { align: 'right' })
 
   y = 28
-
-  // ── QUOTE TITLE BAR ─────────────────────────────────────────────────────────
   doc.setFillColor(...LIGHT_GRAY)
   doc.rect(margin, y, contentW, 8, 'F')
   doc.setTextColor(0, 0, 0)
   doc.setFontSize(11)
   doc.setFont('helvetica', 'bold')
   doc.text('QUOTATION', pageW / 2, y + 5.5, { align: 'center' })
-
   y += 12
 
-  // ── DATE & QUOTE NUMBER ──────────────────────────────────────────────────────
   const today = new Date()
   const quoteNum = `SPPL/AS/${formatDDMMYY(today)}`
-
   doc.setFontSize(9)
   doc.setFont('helvetica', 'normal')
   doc.setTextColor(0, 0, 0)
   doc.text(`Date: ${formatDateDisplay(today)}`, margin, y)
   doc.text(`Quote No: ${quoteNum}`, pageW - margin, y, { align: 'right' })
-
   y += 8
 
-  // ── CUSTOMER BLOCK ───────────────────────────────────────────────────────────
   doc.setFontSize(9)
   doc.setFont('helvetica', 'bold')
   doc.setTextColor(...BLUE)
@@ -86,41 +73,23 @@ export function generateQuote(deal: any): void {
     doc.text(lines, margin, y)
     y += lines.length * 4.5
   }
-
   y += 4
 
-  // ── SALUTATION ───────────────────────────────────────────────────────────────
   doc.setFontSize(9)
   doc.setFont('helvetica', 'normal')
   doc.text('Dear Sir,', margin, y)
   y += 5
-  const salutation = 'We are pleased to Quote as follows for your requirement of AIR SHOWERS.'
-  doc.text(salutation, margin, y)
+  doc.text('We are pleased to Quote as follows for your requirement of AIR SHOWERS.', margin, y)
   y += 8
 
-  // ── TECHNICAL SPECIFICATIONS TABLE ──────────────────────────────────────────
   const motorBrand = deal.motorBrand === 'other' ? deal.motorBrandOther : deal.motorBrand
   const motorStr = deal.motorType && motorBrand ? `${deal.motorType.toUpperCase()} - ${motorBrand}` : deal.motorType || '—'
-
-  const outerDims = (deal.outerWidth && deal.outerHeight && deal.outerDepth)
-    ? `${deal.outerWidth} x ${deal.outerHeight} x ${deal.outerDepth} mm`
-    : '—'
-  const innerDims = (deal.innerWidth && deal.innerHeight && deal.innerDepth)
-    ? `${deal.innerWidth} x ${deal.innerHeight} x ${deal.innerDepth} mm`
-    : '—'
-
-  const materialMap: Record<string, string> = {
-    ms: 'MS (Mild Steel)',
-    ss304: 'SS 304',
-    ss202: 'SS 202',
-    ms_ss304: 'MS + SS 304',
-  }
+  const outerDims = (deal.outerWidth && deal.outerHeight && deal.outerDepth) ? `${deal.outerWidth} x ${deal.outerHeight} x ${deal.outerDepth} mm` : '—'
+  const innerDims = (deal.innerWidth && deal.innerHeight && deal.innerDepth) ? `${deal.innerWidth} x ${deal.innerHeight} x ${deal.innerDepth} mm` : '—'
+  const materialMap: Record<string, string> = { ms: 'MS (Mild Steel)', ss304: 'SS 304', ss202: 'SS 202', ms_ss304: 'MS + SS 304' }
   const materialStr = deal.material ? (materialMap[deal.material] || deal.material.toUpperCase()) : '—'
-
   const cabinetFinish = deal.material?.includes('ss') ? 'SS Finish' : 'Powder Coated'
-  const elecSupply = deal.motorType === 'ie3' || deal.motorType === 'ie2'
-    ? '3 Phase, 415V, 50Hz'
-    : 'Single Phase, 230V, 50Hz'
+  const elecSupply = deal.motorType === 'ie3' || deal.motorType === 'ie2' ? '3 Phase, 415V, 50Hz' : 'Single Phase, 230V, 50Hz'
 
   const specRows = [
     ['Model', deal.dealNumber || '—'],
@@ -136,10 +105,7 @@ export function generateQuote(deal: any): void {
     ['Electrical Supply', elecSupply],
     ['Warranty', '12 Months from date of supply'],
   ]
-
-  if (deal.specNotes) {
-    specRows.push(['Notes', deal.specNotes])
-  }
+  if (deal.specNotes) specRows.push(['Notes', deal.specNotes])
 
   autoTable(doc, {
     startY: y,
@@ -153,8 +119,6 @@ export function generateQuote(deal: any): void {
   })
 
   y = (doc as any).lastAutoTable.finalY + 6
-
-  // ── PRODUCT PHOTO PLACEHOLDER ────────────────────────────────────────────────
   doc.setDrawColor(180, 180, 180)
   doc.setFillColor(245, 245, 245)
   doc.roundedRect(margin, y, (contentW - 4) / 2, 30, 2, 2, 'FD')
@@ -163,14 +127,11 @@ export function generateQuote(deal: any): void {
   doc.setFontSize(8)
   doc.text('Product Photo 1', margin + (contentW - 4) / 4, y + 16, { align: 'center' })
   doc.text('Product Photo 2', margin + (contentW - 4) / 2 + 4 + (contentW - 4) / 4, y + 16, { align: 'center' })
-
   y += 36
 
-  // ── PRICING TABLE ────────────────────────────────────────────────────────────
   const basicPrice = deal.quotedAmount || 0
   const gstAmount = basicPrice * 0.18
   const totalWithGst = basicPrice + gstAmount
-
   const fmt = (n: number) => n > 0 ? `₹ ${n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'
 
   autoTable(doc, {
@@ -185,21 +146,11 @@ export function generateQuote(deal: any): void {
     theme: 'grid',
     headStyles: { fillColor: YELLOW, textColor: [0, 0, 0], fontStyle: 'bold', fontSize: 8 },
     bodyStyles: { fontSize: 8 },
-    columnStyles: {
-      0: { cellWidth: 10 },
-      1: { cellWidth: 40 },
-      2: { cellWidth: 25 },
-      3: { cellWidth: 10 },
-      4: { cellWidth: 22 },
-      5: { cellWidth: 13 },
-      6: { cellWidth: 28 },
-    },
+    columnStyles: { 0: { cellWidth: 10 }, 1: { cellWidth: 40 }, 2: { cellWidth: 25 }, 3: { cellWidth: 10 }, 4: { cellWidth: 22 }, 5: { cellWidth: 13 }, 6: { cellWidth: 28 } },
     margin: { left: margin, right: margin },
   })
 
   y = (doc as any).lastAutoTable.finalY + 6
-
-  // ── OPTIONAL ITEMS TABLE ─────────────────────────────────────────────────────
   const optionalItems = [
     ['1', 'Sensor (Single Leaf)', '1', '—', '—', '85122090', '18%', ''],
     ['2', 'Sensor (Double Leaf)', '1', '—', '—', '85122090', '18%', ''],
@@ -208,7 +159,6 @@ export function generateQuote(deal: any): void {
     ['5', 'Wood Pack / Export Pack', '1', '—', '—', '44152000', '18%', ''],
     ['6', 'Micro Switch', '1', '—', '—', '85369090', '18%', ''],
   ]
-
   autoTable(doc, {
     startY: y,
     head: [['SI#', 'Item', 'Qty', 'Basic Price (INR)', 'Amount', 'HSN CODE', 'GST', 'Remarks']],
@@ -221,11 +171,8 @@ export function generateQuote(deal: any): void {
   })
 
   y = (doc as any).lastAutoTable.finalY + 6
-
-  // ── COMMERCIALS TABLE ────────────────────────────────────────────────────────
   const freightScope = deal.freightPaidBy === 'customer' ? 'Customer Scope' : 'SAM Products Scope'
   const installScope = deal.installationType === 'customer' ? 'Customer Scope' : 'SAM Products Scope'
-
   autoTable(doc, {
     startY: y,
     head: [['', 'COMMERCIALS', 'MODEL: AIR SHOWER']],
@@ -245,8 +192,6 @@ export function generateQuote(deal: any): void {
   })
 
   y = (doc as any).lastAutoTable.finalY + 8
-
-  // ── FOOTER ───────────────────────────────────────────────────────────────────
   doc.setFontSize(8.5)
   doc.setFont('helvetica', 'italic')
   doc.setTextColor(60, 60, 60)
@@ -260,7 +205,6 @@ export function generateQuote(deal: any): void {
   doc.setFont('helvetica', 'normal')
   doc.text('SAM PRODUCTS Pvt Ltd', margin, y)
 
-  // Save
   const fileName = `Quote_${quoteNum.replace(/\//g, '_')}_${deal.customerCompany || deal.customerName || 'Customer'}.pdf`
   doc.save(fileName)
 }

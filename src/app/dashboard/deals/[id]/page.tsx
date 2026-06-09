@@ -450,20 +450,40 @@ export default function DealDetailPage() {
 
         {/* Activity Tab */}
         <TabsContent value="activity" className="mt-4 space-y-4">
-          {/* Add note */}
+          {/* Log Note / Call */}
           <Card>
-            <CardContent className="p-4">
+            <CardHeader><CardTitle className="text-sm">Log Note / Call</CardTitle></CardHeader>
+            <CardContent className="p-4 pt-0 space-y-3">
+              <div className="flex gap-2">
+                {(['note', 'call', 'meeting'] as const).map(t => (
+                  <button
+                    key={t}
+                    onClick={() => setNoteType(t)}
+                    className={`px-3 py-1 text-xs rounded-full border transition-colors capitalize ${
+                      noteType === t
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
+                    }`}
+                  >
+                    {t === 'note' ? '📝 Note' : t === 'call' ? '📞 Call' : '🤝 Meeting'}
+                  </button>
+                ))}
+              </div>
               <div className="flex gap-3">
                 <div className="flex-1">
                   <Textarea
-                    placeholder="Add a note, call summary, or update..."
+                    placeholder={
+                      noteType === 'call' ? 'Summarize the call...' :
+                      noteType === 'meeting' ? 'Summarize the meeting...' :
+                      'Add a note or update...'
+                    }
                     value={note}
                     onChange={e => setNote(e.target.value)}
                     rows={3}
                   />
                 </div>
                 <Button onClick={addNote} disabled={savingNote || !note.trim()}>
-                  {savingNote ? 'Saving...' : 'Add Note'}
+                  {savingNote ? 'Saving...' : 'Submit'}
                 </Button>
               </div>
             </CardContent>
@@ -673,6 +693,23 @@ export default function DealDetailPage() {
             <CardHeader><CardTitle className="text-sm">Document Generation</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="flex flex-col gap-3">
+                <div className="flex items-start gap-4 p-4 rounded-lg border border-gray-200 bg-white">
+                  <FileText className="w-8 h-8 text-purple-500 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-900">Technical Data Sheet (TDS)</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Generate a TDS PDF with product specifications. Sent to customers before quoting.</p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => generateTDS(deal)}
+                    className="flex items-center gap-1.5"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    Generate TDS
+                  </Button>
+                </div>
+
                 <div className="flex items-start gap-4 p-4 rounded-lg border border-gray-200 bg-white">
                   <FileText className="w-8 h-8 text-blue-500 flex-shrink-0 mt-0.5" />
                   <div className="flex-1">

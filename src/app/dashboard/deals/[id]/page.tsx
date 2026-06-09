@@ -77,6 +77,120 @@ function HeatBadge({ score }: { score: string }) {
   return <span className="flex items-center gap-1 text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full"><Snowflake className="w-3 h-3" /> Cold</span>
 }
 
+function LogPaymentButton({ dealId, onSaved }: { dealId: string, onSaved: () => void }) {
+  const [open, setOpen] = useState(false)
+  const [form, setForm] = useState({ type: 'advance', amount: '', date: new Date().toISOString().split('T')[0], notes: '' })
+  const [saving, setSaving] = useState(false)
+
+  const handleSave = async () => {
+    if (!form.amount) return
+    setSaving(true)
+    await fetch('/api/payments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dealId, type: form.type, amount: parseFloat(form.amount), date: new Date(form.date).toISOString(), notes: form.notes })
+    })
+    setOpen(false)
+    setForm({ type: 'advance', amount: '', date: new Date().toISOString().split('T')[0], notes: '' })
+    setSaving(false)
+    onSaved()
+  }
+
+  return (
+    <>
+      <Button size="sm" onClick={() => setOpen(true)}><Plus className="w-3.5 h-3.5 mr-1" /> Log Payment</Button>
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-sm space-y-4">
+            <h3 className="font-semibold text-gray-900">Log Payment</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Type</label>
+                <select value={form.type} onChange={e => setForm(f => ({...f, type: e.target.value}))}
+                  className="w-full h-9 px-3 rounded-lg border border-gray-300 text-sm bg-white">
+                  <option value="advance">Advance</option>
+                  <option value="balance">Balance</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Amount (₹)</label>
+                <input type="number" value={form.amount} onChange={e => setForm(f => ({...f, amount: e.target.value}))}
+                  placeholder="0" className="w-full h-9 px-3 rounded-lg border border-gray-300 text-sm" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Date</label>
+                <input type="date" value={form.date} onChange={e => setForm(f => ({...f, date: e.target.value}))}
+                  className="w-full h-9 px-3 rounded-lg border border-gray-300 text-sm" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Notes</label>
+                <Textarea value={form.notes} onChange={e => setForm(f => ({...f, notes: e.target.value}))} rows={2} placeholder="Optional notes..." />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>Cancel</Button>
+              <Button size="sm" onClick={handleSave} disabled={saving || !form.amount}>
+                {saving ? 'Saving...' : 'Save'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+function NewQuoteButton({ dealId, onSaved }: { dealId: string, onSaved: () => void }) {
+  const [open, setOpen] = useState(false)
+  const [form, setForm] = useState({ amount: '', notes: '' })
+  const [saving, setSaving] = useState(false)
+
+  const handleSave = async () => {
+    if (!form.amount) return
+    setSaving(true)
+    await fetch('/api/quotes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dealId, amount: parseFloat(form.amount), notes: form.notes })
+    })
+    setOpen(false)
+    setForm({ amount: '', notes: '' })
+    setSaving(false)
+    onSaved()
+  }
+
+  return (
+    <>
+      <Button size="sm" variant="outline" onClick={() => setOpen(true)}><Plus className="w-3.5 h-3.5 mr-1" /> New Quote Version</Button>
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-sm space-y-4">
+            <h3 className="font-semibold text-gray-900">New Quote Version</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Amount (₹, ex-GST)</label>
+                <input type="number" value={form.amount} onChange={e => setForm(f => ({...f, amount: e.target.value}))}
+                  placeholder="0" className="w-full h-9 px-3 rounded-lg border border-gray-300 text-sm" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Notes</label>
+                <Textarea value={form.notes} onChange={e => setForm(f => ({...f, notes: e.target.value}))} rows={2} placeholder="Changes from previous version..." />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>Cancel</Button>
+              <Button size="sm" onClick={handleSave} disabled={saving || !form.amount}>
+                {saving ? 'Saving...' : 'Save'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
 export default function DealDetailPage() {
   const { id } = useParams()
   const router = useRouter()
@@ -644,8 +758,25 @@ export default function DealDetailPage() {
 
         {/* Payments Tab */}
         <TabsContent value="payments" className="mt-4 space-y-4">
+          {/* Status flags */}
+          <div className="flex gap-4">
+            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm ${deal.advanceReceived ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
+              {deal.advanceReceived ? <Check className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+              Advance {deal.advanceReceived ? 'Received' : 'Pending'}
+            </div>
+            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm ${deal.balancePaid ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
+              {deal.balancePaid ? <Check className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+              Balance {deal.balancePaid ? 'Paid' : 'Pending'}
+            </div>
+          </div>
+
           <Card>
-            <CardHeader><CardTitle className="text-sm">Payment Summary</CardTitle></CardHeader>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm">Payment Summary</CardTitle>
+                {canEdit && <LogPaymentButton dealId={deal.id as string} onSaved={fetchDeal} />}
+              </div>
+            </CardHeader>
             <CardContent>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
@@ -688,7 +819,43 @@ export default function DealDetailPage() {
           )}
         </TabsContent>
         {/* Documents Tab */}
-        <TabsContent value="documents" className="mt-4">
+        <TabsContent value="documents" className="mt-4 space-y-4">
+          {/* Quote History */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm">Quote History</CardTitle>
+                {canEdit && <NewQuoteButton dealId={deal.id as string} onSaved={fetchDeal} />}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {deal.quotes.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-4">No quotes recorded yet</p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-200 text-gray-500">
+                      <th className="pb-2 text-left font-medium">Version</th>
+                      <th className="pb-2 text-left font-medium">Amount</th>
+                      <th className="pb-2 text-left font-medium">Date</th>
+                      <th className="pb-2 text-left font-medium">Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {deal.quotes.map((q: any) => (
+                      <tr key={q.id} className="hover:bg-gray-50">
+                        <td className="py-2 font-medium">v{q.version}</td>
+                        <td className="py-2 font-medium text-gray-900">{formatCurrency(q.amount)}</td>
+                        <td className="py-2 text-gray-500">{formatDate(q.createdAt)}</td>
+                        <td className="py-2 text-gray-400 text-xs">{q.notes || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader><CardTitle className="text-sm">Document Generation</CardTitle></CardHeader>
             <CardContent className="space-y-4">

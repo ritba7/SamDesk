@@ -47,6 +47,25 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const updateData: any = { ...rest }
   if (newStage) updateData.stage = newStage
 
+  // Heat score auto-calculation
+  const stageForHeat = newStage || existing.stage
+  const lastActivity = await prisma.activity.findFirst({
+    where: { dealId: params.id },
+    orderBy: { createdAt: 'desc' }
+  })
+  const daysSinceActivity = lastActivity
+    ? Math.floor((Date.now() - new Date(lastActivity.createdAt).getTime()) / (1000 * 60 * 60 * 24))
+    : Math.floor((Date.now() - new Date(existing.updatedAt).getTime()) / (1000 * 60 * 60 * 24))
+
+  if (['po_received', 'po_vetted', 'pi_sent', 'approval_pending'].includes(stageForHeat)) {
+    updateData.heatScore = 'hot'
+  } else if (['inquiry', 'tds_sent', 'quote_sent'].includes(stageForHeat)) {
+    updateData.heatScore = 'warm'
+  } else if (daysSinceActivity > 14) {
+    updateData.heatScore = 'cold'
+  }
+  // else keep existing heatScore (don't override)
+
   const deal = await prisma.deal.update({
     where: { id: params.id },
     data: updateData

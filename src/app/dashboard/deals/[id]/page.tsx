@@ -199,7 +199,7 @@ export default function DealDetailPage() {
 
         {/* Stage progression */}
         {canEdit && !isLost && !isWon && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 relative">
             {nextStage && (
               <Button
                 onClick={() => changeStage(nextStage)}
@@ -210,9 +210,35 @@ export default function DealDetailPage() {
               </Button>
             )}
             {!isLost && (
-              <Button variant="destructive" size="sm" onClick={() => changeStage('closed_lost')}>
-                Mark Lost
-              </Button>
+              <div className="relative">
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setShowLostDropdown(v => !v)}
+                >
+                  Mark as Lost
+                </Button>
+                {showLostDropdown && (
+                  <div className="absolute right-0 top-full mt-1 w-52 bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1">
+                    <p className="text-xs text-gray-500 px-3 py-1.5 border-b">Select reason:</p>
+                    {['Price', 'Competition', 'Project Cancelled', 'No Response', 'Other'].map(reason => (
+                      <button
+                        key={reason}
+                        className="w-full text-left text-sm px-3 py-2 hover:bg-red-50 hover:text-red-700 transition-colors"
+                        onClick={() => markLost(reason)}
+                      >
+                        {reason}
+                      </button>
+                    ))}
+                    <button
+                      className="w-full text-left text-xs px-3 py-1.5 text-gray-400 hover:text-gray-600 border-t"
+                      onClick={() => setShowLostDropdown(false)}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         )}
@@ -309,6 +335,66 @@ export default function DealDetailPage() {
 
         {/* Overview Tab */}
         <TabsContent value="overview" className="mt-4 space-y-4">
+          {/* Stage Advancement */}
+          {canEdit && !isLost && !isWon && (
+            <Card>
+              <CardHeader><CardTitle className="text-sm">Stage Advancement</CardTitle></CardHeader>
+              <CardContent className="flex flex-wrap items-center gap-3">
+                {nextStage ? (
+                  <>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-gray-700">
+                        Current: <span className={`font-medium px-1.5 py-0.5 rounded text-xs ${getStageColor(deal.stage)}`}>{getStageLabel(deal.stage)}</span>
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        Next: <span className="font-medium text-blue-600">{getStageLabel(nextStage)}</span>
+                      </p>
+                    </div>
+                    <Button
+                      onClick={() => changeStage(nextStage)}
+                      disabled={stageLoading}
+                      size="sm"
+                      className="flex items-center gap-1.5"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                      Move to {getStageLabel(nextStage)}
+                    </Button>
+                  </>
+                ) : (
+                  <p className="text-sm text-gray-500">Deal is at the final active stage.</p>
+                )}
+                <div className="relative">
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => setShowLostDropdown(v => !v)}
+                  >
+                    Mark as Lost
+                  </Button>
+                  {showLostDropdown && (
+                    <div className="absolute right-0 top-full mt-1 w-52 bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1">
+                      <p className="text-xs text-gray-500 px-3 py-1.5 border-b">Select reason:</p>
+                      {['Price', 'Competition', 'Project Cancelled', 'No Response', 'Other'].map(reason => (
+                        <button
+                          key={reason}
+                          className="w-full text-left text-sm px-3 py-2 hover:bg-red-50 hover:text-red-700 transition-colors"
+                          onClick={() => markLost(reason)}
+                        >
+                          {reason}
+                        </button>
+                      ))}
+                      <button
+                        className="w-full text-left text-xs px-3 py-1.5 text-gray-400 hover:text-gray-600 border-t"
+                        onClick={() => setShowLostDropdown(false)}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card>
               <CardHeader><CardTitle className="text-sm">Customer Details</CardTitle></CardHeader>

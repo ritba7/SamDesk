@@ -17,6 +17,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { formatCurrency, formatDate, getStageColor, getStageLabel, STAGES, PRODUCTION_STAGES } from '@/lib/utils'
 import { generateQuote } from '@/lib/generateQuote'
 import { generatePI } from '@/lib/generatePI'
+import { generateTDS } from '@/lib/generateTDS'
 
 interface Deal {
   id: string
@@ -83,8 +84,11 @@ export default function DealDetailPage() {
   const [deal, setDeal] = useState<Deal | null>(null)
   const [loading, setLoading] = useState(true)
   const [note, setNote] = useState('')
+  const [noteType, setNoteType] = useState<'note' | 'call' | 'meeting'>('note')
   const [savingNote, setSavingNote] = useState(false)
   const [stageLoading, setStageLoading] = useState(false)
+  const [showLostDropdown, setShowLostDropdown] = useState(false)
+  const [lostReason, setLostReason] = useState('')
 
   const user = session?.user as any
   const role = user?.role
@@ -109,13 +113,27 @@ export default function DealDetailPage() {
     setStageLoading(false)
   }
 
+  const markLost = async (reason: string) => {
+    if (!deal) return
+    setStageLoading(true)
+    await fetch(`/api/deals/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stage: 'closed_lost', lostReason: reason })
+    })
+    setShowLostDropdown(false)
+    setLostReason('')
+    await fetchDeal()
+    setStageLoading(false)
+  }
+
   const addNote = async () => {
     if (!note.trim()) return
     setSavingNote(true)
     await fetch('/api/activities', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dealId: id, type: 'note', content: note })
+      body: JSON.stringify({ dealId: id, type: noteType, content: note })
     })
     setNote('')
     await fetchDeal()

@@ -18,7 +18,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['director', 'vp', 'accounts', 'manufacturing', 'design'] },
-  { href: '/dashboard/deals', label: 'Deals', icon: FileText, roles: ['director', 'vp', 'accounts', 'design'] },
+  { href: '/dashboard/deals', label: 'Pipeline', icon: FileText, roles: ['director', 'vp', 'accounts', 'design'] },
   { href: '/dashboard/tasks', label: 'Tasks', icon: CheckSquare, roles: ['director', 'vp', 'accounts', 'manufacturing', 'design'] },
   { href: '/dashboard/production', label: 'Production', icon: Factory, roles: ['director', 'vp', 'manufacturing'] },
   { href: '/dashboard/inventory', label: 'Inventory', icon: Package, roles: ['director', 'manufacturing'] },

@@ -80,7 +80,7 @@ export default function InventoryPage() {
       </div>
       {loading ? <div className="text-center py-12 text-gray-400">Loading inventory...</div> :
         filtered.length === 0 ? <div className="text-center py-12"><Package className="w-10 h-10 text-gray-200 mx-auto mb-3" /><p className="text-gray-400">No items found</p></div> :
-        Object.entries(grouped).map(([category, categoryItems]: [string, any[]]) => (
+        (Object.entries(grouped) as [string, any[]][]).map(([category, categoryItems]) => (
           <Card key={category}>
             <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-600">{CATEGORIES[category] || category}</CardTitle></CardHeader>
             <CardContent>

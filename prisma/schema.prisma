@@ -102,6 +102,26 @@ model Deal {
   balanceDate     DateTime?
   gstRate         Float?   @default(18)
 
+  // Inquiry & verification
+  gstNumber         String?
+  verificationScore Int?    @default(0)
+  verificationData  String? // JSON
+  productInterest   String?
+  querySummary      String?
+  estimatedQty      Int?
+  timeline          String?
+  budgetIndication  Float?
+  priority          String? @default("medium")
+  source            String?
+  customerWebsite   String?
+  specialRequirements String?
+  roughWidth        Float?
+  roughHeight       Float?
+  roughDepth        Float?
+  motorPreference   String?
+  internalNotes     String?
+  expectedCloseDate DateTime?
+
   // Flags
   inspectionType  String?  // physical, waiver
   installationDone Boolean @default(false)

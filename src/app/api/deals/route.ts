@@ -46,12 +46,14 @@ export async function POST(req: NextRequest) {
   const count = await prisma.deal.count()
   const dealNumber = `SD-${String(count + 1).padStart(4, '0')}-${new Date().getFullYear()}`
 
+  const { expectedCloseDate, ...rest } = body
   const deal = await prisma.deal.create({
     data: {
-      ...body,
+      ...rest,
       dealNumber,
       createdById: user.id,
       stage: 'inquiry',
+      ...(expectedCloseDate ? { expectedCloseDate: new Date(expectedCloseDate) } : {}),
     }
   })
 

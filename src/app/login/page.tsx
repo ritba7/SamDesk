@@ -32,13 +32,6 @@ export default function LoginPage() {
     }
   }
 
-  const demoAccounts = [
-    { role: 'Director', email: 'director@samdesk.in', password: 'Director@123' },
-    { role: 'VP / Assistant', email: 'vp@samdesk.in', password: 'VP@123456' },
-    { role: 'Accounts', email: 'accounts@samdesk.in', password: 'Accounts@123' },
-    { role: 'Manufacturing', email: 'mfg@samdesk.in', password: 'Mfg@123456' },
-    { role: 'Design', email: 'design@samdesk.in', password: 'Design@123' },
-  ]
 
   return (
     <div className="min-h-screen flex">
@@ -118,17 +111,7 @@ export default function LoginPage() {
                 {loading ? 'Signing in...' : 'Sign in'}
               </button>
             </form>
-            <div className="mt-6 pt-6 border-t border-gray-100">
-              <p className="text-xs text-gray-500 mb-3 font-medium uppercase tracking-wide">Quick login (demo)</p>
-              <div className="grid grid-cols-1 gap-2">
-                {demoAccounts.map(acc => (
-                  <button key={acc.email} type="button" onClick={() => { setEmail(acc.email); setPassword(acc.password) }} className="flex items-center justify-between px-3 py-2 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 text-xs transition-colors text-left">
-                    <span className="font-medium text-gray-700">{acc.role}</span>
-                    <span className="text-gray-400">{acc.email}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
+
           </div>
         </div>
       </div>

@@ -7,7 +7,8 @@ import {
   ArrowLeft, CheckSquare, Clock, FileText, Plus,
   Flame, Thermometer, Snowflake, ChevronRight,
   Activity, DollarSign, Factory, Calendar,
-  MessageSquare, AlertCircle, Check, Download
+  MessageSquare, AlertCircle, Check, Download,
+  Shield, Phone, Mail as MailIcon
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -33,6 +34,9 @@ export default function DealDetailPage() {
   const [note, setNote] = useState('')
   const [savingNote, setSavingNote] = useState(false)
   const [stageLoading, setStageLoading] = useState(false)
+  const [logType, setLogType] = useState<'call'|'email'|null>(null)
+  const [logContent, setLogContent] = useState('')
+  const [loggingActivity, setLoggingActivity] = useState(false)
 
   const user = session?.user as any
   const role = user?.role
@@ -60,6 +64,13 @@ export default function DealDetailPage() {
   const markTaskDone = async (taskId: string) => {
     await fetch(`/api/tasks/${taskId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'done' }) })
     await fetchDeal()
+  }
+
+  const logActivity = async () => {
+    if (!logContent.trim() || !logType) return
+    setLoggingActivity(true)
+    await fetch('/api/activities', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dealId: id, type: logType, content: logContent }) })
+    setLogContent(''); setLogType(null); await fetchDeal(); setLoggingActivity(false)
   }
 
   const updateProductionStage = async (stageId: string, status: string) => {
@@ -98,9 +109,15 @@ export default function DealDetailPage() {
           </div>
         </div>
         {canEdit && !isLost && !isWon && (
-          <div className="flex items-center gap-2">
-            {nextStage && <Button onClick={() => changeStage(nextStage)} disabled={stageLoading} size="sm">Move to {getStageLabel(nextStage)} <ChevronRight className="w-3 h-3" /></Button>}
-            <Button variant="destructive" size="sm" onClick={() => changeStage('closed_lost')}>Mark Lost</Button>
+          <div>
+            <div className="flex items-center gap-2">
+              {nextStage && <Button onClick={() => changeStage(nextStage)} disabled={stageLoading} size="sm">Move to {getStageLabel(nextStage)} <ChevronRight className="w-3 h-3" /></Button>}
+              <Button variant="destructive" size="sm" onClick={() => changeStage('closed_lost')}>Mark Lost</Button>
+            </div>
+            <div className="flex items-center gap-2 mt-2">
+              <Button variant="outline" size="sm" onClick={() => setLogType('call')}><Phone className="w-3 h-3 mr-1" />Log Call</Button>
+              <Button variant="outline" size="sm" onClick={() => setLogType('email')}><MailIcon className="w-3 h-3 mr-1" />Log Email</Button>
+            </div>
           </div>
         )}
       </div>
@@ -148,6 +165,7 @@ export default function DealDetailPage() {
           <TabsTrigger value="production">Production</TabsTrigger>
           <TabsTrigger value="payments">Payments</TabsTrigger>
           <TabsTrigger value="documents">Documents</TabsTrigger>
+          <TabsTrigger value="verification">Verification</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-4 space-y-4">
@@ -170,6 +188,25 @@ export default function DealDetailPage() {
               </CardContent>
             </Card>
           </div>
+          <Card><CardHeader><CardTitle className="text-sm">Communication Log</CardTitle></CardHeader>
+            <CardContent>
+              {deal.activities.filter((a: any) => a.type === 'call' || a.type === 'email').length === 0 ? (
+                <p className="text-gray-400 text-sm">No calls or emails logged yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {deal.activities.filter((a: any) => a.type === 'call' || a.type === 'email').map((act: any) => (
+                    <div key={act.id} className="flex gap-2 text-sm p-2 rounded-lg bg-gray-50">
+                      {act.type === 'call' ? <Phone className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" /> : <MailIcon className="w-4 h-4 text-purple-500 flex-shrink-0 mt-0.5" />}
+                      <div>
+                        <p className="text-gray-700">{act.content}</p>
+                        <p className="text-xs text-gray-400">{act.user?.name} &middot; {formatDate(act.createdAt)}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="activity" className="mt-4 space-y-4">
@@ -300,7 +337,62 @@ export default function DealDetailPage() {
             </CardContent>
           </Card>
         </TabsContent>
+        <TabsContent value="verification" className="mt-4 space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm flex items-center gap-2"><Shield className="w-4 h-4" />Customer Verification</CardTitle>
+                {deal.verificationScore !== undefined && deal.verificationScore !== null && (
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${deal.verificationScore >= 80 ? 'bg-green-100 text-green-700' : deal.verificationScore >= 50 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
+                    Score: {deal.verificationScore}%
+                  </span>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              {deal.gstNumber && <div className="flex justify-between"><span className="text-gray-500">GST Number</span><span className="font-mono">{deal.gstNumber}</span></div>}
+              {deal.verificationData && (() => {
+                try {
+                  const vd = JSON.parse(deal.verificationData)
+                  return (
+                    <div className="bg-gray-50 rounded-lg p-3 space-y-1">
+                      {vd.legalName && <p><span className="text-gray-500">Legal Name: </span>{vd.legalName}</p>}
+                      {vd.state && <p><span className="text-gray-500">Registered State: </span>{vd.state}</p>}
+                      {vd.status && <p><span className="text-gray-500">Status: </span>{vd.status}</p>}
+                      {vd.registrationDate && <p><span className="text-gray-500">Registered: </span>{vd.registrationDate}</p>}
+                    </div>
+                  )
+                } catch { return null }
+              })()}
+              {!deal.gstNumber && <p className="text-yellow-600 text-sm">No GST number provided for this deal.</p>}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader><CardTitle className="text-sm">Customer Details Summary</CardTitle></CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              {deal.customerName && <div className="flex justify-between"><span className="text-gray-500">Contact</span><span>{deal.customerName}</span></div>}
+              {deal.customerCompany && <div className="flex justify-between"><span className="text-gray-500">Company</span><span>{deal.customerCompany}</span></div>}
+              {deal.customerEmail && <div className="flex justify-between"><span className="text-gray-500">Email</span><span>{deal.customerEmail}</span></div>}
+              {deal.customerPhone && <div className="flex justify-between"><span className="text-gray-500">Phone</span><span>{deal.customerPhone}</span></div>}
+              {deal.source && <div className="flex justify-between"><span className="text-gray-500">Source</span><span className="capitalize">{deal.source.replace('_',' ')}</span></div>}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
+      {logType && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-md mx-4">
+            <CardHeader><CardTitle className="text-base">Log {logType === 'call' ? 'Call' : 'Email'}</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              <Textarea placeholder={`Describe the ${logType}...`} value={logContent} onChange={e => setLogContent(e.target.value)} rows={4} />
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" onClick={() => { setLogType(null); setLogContent('') }}>Cancel</Button>
+                <Button onClick={logActivity} disabled={loggingActivity || !logContent.trim()}>{loggingActivity ? 'Saving...' : 'Save'}</Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }

@@ -76,6 +76,20 @@ export default function DealsPage() {
                     <div className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /><span>Updated {formatDate(deal.updatedAt)}</span></div>
                   </div>
                   {deal.tasks && deal.tasks.length > 0 && <div className="mt-3 pt-3 border-t border-gray-100"><span className="text-xs text-amber-600 font-medium">{deal.tasks.length} pending task{deal.tasks.length > 1 ? 's' : ''}</span></div>}
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {deal.priority && deal.priority !== 'medium' && (
+                      <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${deal.priority === 'high' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'}`}>
+                        {deal.priority === 'high' ? 'High' : 'Low'} Priority
+                      </span>
+                    )}
+                    {deal.productInterest && <span className="text-xs px-1.5 py-0.5 rounded bg-blue-50 text-blue-700">{deal.productInterest}</span>}
+                    {deal.source && <span className="text-xs px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 capitalize">{deal.source.replace('_',' ')}</span>}
+                    {deal.verificationScore !== null && deal.verificationScore !== undefined && (
+                      <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${deal.verificationScore >= 80 ? 'bg-green-100 text-green-700' : deal.verificationScore >= 50 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
+                        {deal.verificationScore}% verified
+                      </span>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             </Link>

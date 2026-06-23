@@ -63,33 +63,53 @@ export default function DealsPage() {
               <Card className="hover:shadow-md hover:border-blue-200 transition-all cursor-pointer h-full">
                 <CardContent className="p-5">
                   <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1 min-w-0"><p className="font-semibold text-gray-900 truncate">{deal.customerName}</p><p className="text-xs text-gray-400 mt-0.5">{deal.customerCompany}</p></div>
-                    <HeatBadge score={deal.heatScore} />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-900 truncate">{deal.customerName}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{deal.customerCompany}</p>
+                    </div>
+                    <div className="flex flex-col items-end gap-1 ml-2">
+                      <HeatBadge score={deal.heatScore} />
+                      {deal.priority && (
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                          deal.priority === 'high' ? 'bg-red-100 text-red-700' :
+                          deal.priority === 'low' ? 'bg-gray-100 text-gray-600' :
+                          'bg-yellow-100 text-yellow-700'
+                        }`}>
+                          {deal.priority === 'high' ? 'High' : deal.priority === 'low' ? 'Low' : 'Med'}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-xs text-gray-400 font-mono">{deal.dealNumber}</span>
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getStageColor(deal.stage)}`}>{getStageLabel(deal.stage)}</span>
                   </div>
+                  {(deal.productInterest || deal.source) && (
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {deal.productInterest && (
+                        <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">
+                          {deal.productInterest === 'air_shower' ? 'Air Shower' :
+                           deal.productInterest === 'air_curtain' ? 'Air Curtain' :
+                           deal.productInterest === 'clean_room' ? 'Clean Room' : 'Other'}
+                        </span>
+                      )}
+                      {deal.source && (
+                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{deal.source}</span>
+                      )}
+                    </div>
+                  )}
                   <div className="space-y-1.5 text-sm text-gray-500">
                     {deal.quotedAmount && <div className="flex items-center gap-1.5"><DollarSign className="w-3.5 h-3.5" /><span className="font-medium text-gray-900">{formatCurrency(deal.quotedAmount)}</span></div>}
                     {deal.assignedTo && <div className="flex items-center gap-1.5"><User className="w-3.5 h-3.5" /><span>{deal.assignedTo.name}</span></div>}
                     <div className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /><span>Updated {formatDate(deal.updatedAt)}</span></div>
                   </div>
+                  {deal.verificationScore !== undefined && deal.verificationScore < 80 && (
+                    <div className="mt-2 flex items-center gap-1 text-xs text-amber-600">
+                      <span>⚠</span>
+                      <span>Verification {deal.verificationScore}%</span>
+                    </div>
+                  )}
                   {deal.tasks && deal.tasks.length > 0 && <div className="mt-3 pt-3 border-t border-gray-100"><span className="text-xs text-amber-600 font-medium">{deal.tasks.length} pending task{deal.tasks.length > 1 ? 's' : ''}</span></div>}
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {deal.priority && deal.priority !== 'medium' && (
-                      <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${deal.priority === 'high' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'}`}>
-                        {deal.priority === 'high' ? 'High' : 'Low'} Priority
-                      </span>
-                    )}
-                    {deal.productInterest && <span className="text-xs px-1.5 py-0.5 rounded bg-blue-50 text-blue-700">{deal.productInterest}</span>}
-                    {deal.source && <span className="text-xs px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 capitalize">{deal.source.replace('_',' ')}</span>}
-                    {deal.verificationScore !== null && deal.verificationScore !== undefined && (
-                      <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${deal.verificationScore >= 80 ? 'bg-green-100 text-green-700' : deal.verificationScore >= 50 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
-                        {deal.verificationScore}% verified
-                      </span>
-                    )}
-                  </div>
                 </CardContent>
               </Card>
             </Link>

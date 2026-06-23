@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import {
   Wind, LayoutDashboard, FileText, CheckSquare, Factory,
-  Package, BarChart3, LogOut, ChevronLeft, ChevronRight, Menu, User
+  Package, BarChart3, LogOut, ChevronLeft, ChevronRight, Menu, User, Bell, CreditCard
 } from 'lucide-react'
 import { cn, ROLES } from '@/lib/utils'
 
@@ -23,6 +23,8 @@ const navItems: NavItem[] = [
   { href: '/dashboard/production', label: 'Production', icon: Factory, roles: ['director', 'vp', 'manufacturing'] },
   { href: '/dashboard/inventory', label: 'Inventory', icon: Package, roles: ['director', 'manufacturing'] },
   { href: '/dashboard/analytics', label: 'Analytics', icon: BarChart3, roles: ['director'] },
+  { href: '/dashboard/followups', label: 'Follow-ups', icon: Bell, roles: ['director', 'vp', 'accounts'] },
+  { href: '/dashboard/accounts', label: 'Accounts', icon: CreditCard, roles: ['director', 'accounts'] },
 ]
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {

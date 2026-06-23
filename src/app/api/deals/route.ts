@@ -46,14 +46,56 @@ export async function POST(req: NextRequest) {
   const count = await prisma.deal.count()
   const dealNumber = `SD-${String(count + 1).padStart(4, '0')}-${new Date().getFullYear()}`
 
-  const { expectedCloseDate, ...rest } = body
+  const {
+    expectedCloseDate,
+    customerName, customerCompany, customerEmail, customerPhone,
+    customerAddress, customerState, gstNumber, source,
+    productInterest, querySummary, estimatedQty, timeline,
+    budgetIndication, specNotes, priority, verificationScore,
+    verificationData, heatScore, assignedToId,
+    material, motorType, motorBrand, motorBrandOther,
+    outerDepth, outerHeight, outerWidth, innerDepth, innerHeight, innerWidth,
+    freightPaidBy, installationType, expectedDispatch,
+  } = body
+
   const deal = await prisma.deal.create({
     data: {
-      ...rest,
+      customerName,
+      customerCompany,
+      ...(customerEmail ? { customerEmail } : {}),
+      ...(customerPhone ? { customerPhone } : {}),
+      ...(customerAddress ? { customerAddress } : {}),
+      ...(customerState ? { customerState } : {}),
+      ...(gstNumber ? { gstNumber } : {}),
+      ...(source ? { source } : {}),
+      ...(productInterest ? { productInterest } : {}),
+      ...(querySummary ? { querySummary } : {}),
+      ...(estimatedQty ? { estimatedQty: Number(estimatedQty) } : {}),
+      ...(timeline ? { timeline } : {}),
+      ...(budgetIndication ? { budgetIndication: Number(budgetIndication) } : {}),
+      ...(specNotes ? { specNotes } : {}),
+      ...(priority ? { priority } : {}),
+      ...(verificationScore !== undefined ? { verificationScore: Number(verificationScore) } : {}),
+      ...(verificationData ? { verificationData } : {}),
+      ...(heatScore ? { heatScore } : {}),
+      ...(assignedToId ? { assignedToId } : {}),
+      ...(material ? { material } : {}),
+      ...(motorType ? { motorType } : {}),
+      ...(motorBrand ? { motorBrand } : {}),
+      ...(motorBrandOther ? { motorBrandOther } : {}),
+      ...(outerDepth ? { outerDepth: Number(outerDepth) } : {}),
+      ...(outerHeight ? { outerHeight: Number(outerHeight) } : {}),
+      ...(outerWidth ? { outerWidth: Number(outerWidth) } : {}),
+      ...(innerDepth ? { innerDepth: Number(innerDepth) } : {}),
+      ...(innerHeight ? { innerHeight: Number(innerHeight) } : {}),
+      ...(innerWidth ? { innerWidth: Number(innerWidth) } : {}),
+      ...(freightPaidBy ? { freightPaidBy } : {}),
+      ...(installationType ? { installationType } : {}),
+      ...(expectedDispatch ? { expectedDispatch: new Date(expectedDispatch) } : {}),
+      ...(expectedCloseDate ? { expectedCloseDate: new Date(expectedCloseDate) } : {}),
       dealNumber,
       createdById: user.id,
       stage: 'inquiry',
-      ...(expectedCloseDate ? { expectedCloseDate: new Date(expectedCloseDate) } : {}),
     }
   })
 

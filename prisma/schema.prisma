@@ -128,6 +128,8 @@ model Deal {
   inspectionTerms  String?   // "waiver" or custom terms
   introEmail       String?   // stored auto-generated intro email
   tdsDeadline      DateTime? // deadline for sending TDS
+  advanceDeadline  DateTime? // deadline to receive advance payment
+  advanceNote      String?   // note about advance terms
 
   // Flags
   inspectionType  String?  // physical, waiver
@@ -225,6 +227,9 @@ model Payment {
   amount    Float
   date      DateTime
   notes     String?
+  paymentMode  String?  // NEFT, RTGS, cheque, cash, UPI, other
+  utrNumber    String?  // UTR / reference number
+  bankAccount  String?  // which bank account received
   deal      Deal     @relation(fields: [dealId], references: [id])
   createdAt DateTime @default(now())
 }

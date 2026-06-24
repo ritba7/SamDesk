@@ -14,7 +14,9 @@ interface Task {
   assignedToId: string
   assignedTo: { name: string; role: string } | null
   deal: { dealNumber: string; customerName: string } | null
+  dealId: string | null
   createdAt: string
+  allAssigneeNames?: string
 }
 
 interface UserWorkload {
@@ -61,8 +63,24 @@ export default function WorkloadPage() {
         const now = new Date()
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
 
+        // Build deduplication map: same dealId+title = same logical task
+        const taskGroups = new Map<string, Task[]>()
+        tasks.forEach(t => {
+          const key = `${t.dealId || 'notask'}-${t.title}`
+          if (!taskGroups.has(key)) taskGroups.set(key, [])
+          taskGroups.get(key)!.push(t)
+        })
+
+        // For each task, compute allAssigneeNames from its group
+        const taskWithAssignees = tasks.map(t => {
+          const key = `${t.dealId || 'notask'}-${t.title}`
+          const group = taskGroups.get(key) || [t]
+          const names = group.map(g => g.assignedTo?.name).filter(Boolean).join(' & ')
+          return { ...t, allAssigneeNames: names }
+        })
+
         const grouped: UserWorkload[] = users.map((u: any) => {
-          const userTasks = tasks.filter((t: Task) => t.assignedToId === u.id)
+          const userTasks = taskWithAssignees.filter((t) => t.assignedToId === u.id)
           const overdue = userTasks.filter(t => t.status === 'pending' && t.dueDate && new Date(t.dueDate) < today)
           const pending = userTasks.filter(t => t.status === 'pending' && (!t.dueDate || new Date(t.dueDate) >= today))
           const done = userTasks.filter(t => t.status === 'done')
@@ -156,7 +174,7 @@ export default function WorkloadPage() {
                     ].map(({ label, tasks, color, bg }) => tasks.length > 0 && (
                       <div key={label}>
                         <p className={`text-xs font-semibold uppercase tracking-wide mb-1 ${color}`}>{label}</p>
-                        {tasks.map(t => (
+                        {tasks.map((t: any) => (
                           <div key={t.id} className={`${bg} rounded-lg px-3 py-2 mb-1`}>
                             <div className="flex items-start justify-between gap-2">
                               <p className="text-sm text-slate-700 font-medium leading-snug">{t.title}</p>
@@ -166,6 +184,9 @@ export default function WorkloadPage() {
                             </div>
                             {t.deal && (
                               <p className="text-xs text-slate-500 mt-0.5">{t.deal.dealNumber} · {t.deal.customerName}</p>
+                            )}
+                            {t.allAssigneeNames && t.allAssigneeNames.includes('&') && (
+                              <p className="text-xs text-slate-400 mt-0.5">Assigned to: {t.allAssigneeNames}</p>
                             )}
                           </div>
                         ))}

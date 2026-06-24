@@ -8,7 +8,7 @@ import {
   Flame, Thermometer, Snowflake, ChevronRight,
   Activity, DollarSign, Factory, Calendar,
   MessageSquare, AlertCircle, Check, Download,
-  Shield, Phone, Mail as MailIcon, Pencil, Copy
+  Shield, Phone, Mail as MailIcon, Pencil, Copy, TrendingUp, Edit
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -34,9 +34,16 @@ export default function DealDetailPage() {
   const [note, setNote] = useState('')
   const [savingNote, setSavingNote] = useState(false)
   const [stageLoading, setStageLoading] = useState(false)
-  const [logType, setLogType] = useState<'call'|'email'|null>(null)
+  const [logType, setLogType] = useState<'call'|'email'|'negotiation'|null>(null)
   const [logContent, setLogContent] = useState('')
   const [loggingActivity, setLoggingActivity] = useState(false)
+  const [logOutcome, setLogOutcome] = useState('neutral')
+  const [logSubType, setLogSubType] = useState('negotiation')
+
+  // Payment form
+  const [paymentForm, setPaymentForm] = useState({ amount: '', type: 'advance', paymentMode: '', utrNumber: '', bankAccount: '', date: new Date().toISOString().split('T')[0], notes: '' })
+  const [savingPayment, setSavingPayment] = useState(false)
+  const [paymentSuccess, setPaymentSuccess] = useState(false)
   const [users, setUsers] = useState<any[]>([])
   const [fuAssignee, setFuAssignee] = useState('')
   const [fuDays, setFuDays] = useState(3)
@@ -109,8 +116,34 @@ export default function DealDetailPage() {
   const logActivity = async () => {
     if (!logContent.trim() || !logType) return
     setLoggingActivity(true)
-    await fetch('/api/activities', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dealId: id, type: logType, content: logContent }) })
-    setLogContent(''); setLogType(null); await fetchDeal(); setLoggingActivity(false)
+    const type = logType === 'negotiation' ? logSubType : logType
+    const metadata = logType === 'negotiation' ? JSON.stringify({ outcome: logOutcome }) : undefined
+    await fetch('/api/activities', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dealId: id, type, content: logContent, ...(metadata ? { metadata } : {}) }) })
+    setLogContent(''); setLogType(null); setLogOutcome('neutral'); setLogSubType('negotiation'); await fetchDeal(); setLoggingActivity(false)
+  }
+
+  const submitPayment = async () => {
+    if (!paymentForm.amount) return
+    setSavingPayment(true)
+    await fetch('/api/payments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        dealId: id,
+        amount: parseFloat(paymentForm.amount),
+        type: paymentForm.type,
+        paymentMode: paymentForm.paymentMode || undefined,
+        utrNumber: paymentForm.utrNumber || undefined,
+        bankAccount: paymentForm.bankAccount || undefined,
+        date: new Date(paymentForm.date).toISOString(),
+        notes: paymentForm.notes || undefined,
+      })
+    })
+    setPaymentForm({ amount: '', type: 'advance', paymentMode: '', utrNumber: '', bankAccount: '', date: new Date().toISOString().split('T')[0], notes: '' })
+    setSavingPayment(false)
+    setPaymentSuccess(true)
+    setTimeout(() => setPaymentSuccess(false), 2000)
+    await fetchDeal()
   }
 
   const submitFollowUp = async () => {
@@ -183,13 +216,20 @@ export default function DealDetailPage() {
           <Link href="/dashboard/deals"><Button variant="ghost" size="icon"><ArrowLeft className="w-4 h-4" /></Button></Link>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-xl font-bold text-gray-900">{deal.customerName}</h1>
+              <h1 className="text-xl font-bold text-gray-900">{deal.customerCompany}</h1>
+              {canEdit && (
+                <Link href={`/dashboard/deals/${id}/edit`}>
+                  <button className="flex items-center gap-1 text-xs px-2 py-1 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-600">
+                    <Edit className="w-3 h-3" /> Edit Deal
+                  </button>
+                </Link>
+              )}
               <HeatBadge score={deal.heatScore} />
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getStageColor(deal.stage)}`}>{getStageLabel(deal.stage)}</span>
             </div>
             <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
               <span className="font-mono">{deal.dealNumber}</span>
-              <span>&middot;</span><span>{deal.customerCompany}</span>
+              <span>&middot;</span><span>POC: {deal.customerName}</span>
               {deal.customerState && <><span>&middot;</span><span>{deal.customerState}</span></>}
             </div>
           </div>
@@ -203,6 +243,7 @@ export default function DealDetailPage() {
             <div className="flex items-center gap-2 mt-2">
               <Button variant="outline" size="sm" onClick={() => setLogType('call')}><Phone className="w-3 h-3 mr-1" />Log Call</Button>
               <Button variant="outline" size="sm" onClick={() => setLogType('email')}><MailIcon className="w-3 h-3 mr-1" />Log Email</Button>
+              <Button variant="outline" size="sm" onClick={() => setLogType('negotiation')}><TrendingUp className="w-3 h-3 mr-1" />Log Negotiation</Button>
             </div>
           </div>
         )}
@@ -259,7 +300,11 @@ export default function DealDetailPage() {
         </Card>
         <Card><CardContent className="p-4"><p className="text-xs text-gray-500">Total Received</p><p className="text-lg font-bold text-green-700">{formatCurrency(totalPaid)}</p></CardContent></Card>
         <Card><CardContent className="p-4"><p className="text-xs text-gray-500">Pending Tasks</p><p className="text-lg font-bold text-amber-600">{pendingTasks.length}</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-xs text-gray-500">Expected Dispatch</p><p className="text-lg font-bold text-gray-900">{deal.expectedDispatch ? formatDate(deal.expectedDispatch) : '—'}</p></CardContent></Card>
+        {deal.advanceDeadline && !deal.advanceReceived ? (
+          <Card><CardContent className="p-4"><p className="text-xs text-gray-500">Advance Due</p><p className={`text-lg font-bold ${new Date(deal.advanceDeadline) < new Date() ? 'text-red-600' : 'text-amber-600'}`}>{formatDate(deal.advanceDeadline)}</p></CardContent></Card>
+        ) : (
+          <Card><CardContent className="p-4"><p className="text-xs text-gray-500">Expected Dispatch</p><p className="text-lg font-bold text-gray-900">{deal.expectedDispatch ? formatDate(deal.expectedDispatch) : '—'}</p></CardContent></Card>
+        )}
       </div>
 
       <Tabs defaultValue="overview">
@@ -435,14 +480,21 @@ export default function DealDetailPage() {
               deal.activities.map((act: any) => (
                 <div key={act.id} className="flex gap-3">
                   <div className="flex flex-col items-center">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${act.type === 'stage_change' ? 'bg-blue-100' : act.type === 'note' ? 'bg-gray-100' : act.type === 'payment' ? 'bg-green-100' : 'bg-purple-100'}`}>
-                      {act.type === 'stage_change' ? <ChevronRight className="w-4 h-4 text-blue-600" /> : act.type === 'note' ? <MessageSquare className="w-4 h-4 text-gray-600" /> : act.type === 'payment' ? <DollarSign className="w-4 h-4 text-green-600" /> : <Activity className="w-4 h-4 text-purple-600" />}
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${act.type === 'stage_change' ? 'bg-blue-100' : act.type === 'note' ? 'bg-gray-100' : act.type === 'payment' ? 'bg-green-100' : act.type === 'negotiation' ? 'bg-orange-100' : 'bg-purple-100'}`}>
+                      {act.type === 'stage_change' ? <ChevronRight className="w-4 h-4 text-blue-600" /> : act.type === 'note' ? <MessageSquare className="w-4 h-4 text-gray-600" /> : act.type === 'payment' ? <DollarSign className="w-4 h-4 text-green-600" /> : act.type === 'negotiation' ? <TrendingUp className="w-4 h-4 text-orange-600" /> : <Activity className="w-4 h-4 text-purple-600" />}
                     </div>
                     <div className="w-px flex-1 bg-gray-200 my-1" />
                   </div>
                   <div className="flex-1 pb-4">
                     <div className="flex items-center gap-2 mb-1"><span className="text-sm font-medium text-gray-900">{act.user?.name}</span><span className="text-xs text-gray-400">{formatDate(act.createdAt)}</span></div>
                     <p className="text-sm text-gray-700">{act.content}</p>
+                    {act.type === 'negotiation' && act.metadata && (() => {
+                      try {
+                        const m = JSON.parse(act.metadata)
+                        const outcomeColors: Record<string, string> = { positive: 'bg-green-100 text-green-700', neutral: 'bg-gray-100 text-gray-600', negative: 'bg-red-100 text-red-700', deal_at_risk: 'bg-orange-100 text-orange-700' }
+                        return m.outcome ? <span className={`inline-block mt-1 text-xs px-2 py-0.5 rounded-full capitalize ${outcomeColors[m.outcome] || outcomeColors.neutral}`}>{m.outcome.replace('_',' ')}</span> : null
+                      } catch { return null }
+                    })()}
                   </div>
                 </div>
               ))
@@ -582,16 +634,78 @@ export default function DealDetailPage() {
                 <div className="flex justify-between"><span className="text-gray-500">Total Quoted</span><span className="font-medium">{deal.quotedAmount ? formatCurrency(deal.quotedAmount) : '—'}</span></div>
                 <div className="flex justify-between"><span className="text-gray-500">Received</span><span className="font-medium text-green-700">{formatCurrency(totalPaid)}</span></div>
                 {deal.quotedAmount && <div className="flex justify-between border-t pt-2"><span className="text-gray-500">Outstanding</span><span className={`font-medium ${deal.quotedAmount - totalPaid > 0 ? 'text-red-600' : 'text-green-600'}`}>{formatCurrency(Math.max(0, deal.quotedAmount - totalPaid))}</span></div>}
+                {deal.advanceDeadline && !deal.advanceReceived && (
+                  <div className="flex justify-between border-t pt-2">
+                    <span className="text-gray-500">Advance Due</span>
+                    <span className={`font-medium px-2 py-0.5 rounded-full text-xs ${new Date(deal.advanceDeadline) < new Date() ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>{formatDate(deal.advanceDeadline)}</span>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
+          {['accounts', 'director'].includes(role) && (
+            <Card>
+              <CardHeader><CardTitle className="text-sm">Record Payment</CardTitle></CardHeader>
+              <CardContent className="space-y-3">
+                {paymentSuccess && <div className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">Saved successfully</div>}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Amount (₹) *</label>
+                    <input type="number" value={paymentForm.amount} onChange={e => setPaymentForm(f => ({...f, amount: e.target.value}))} className="w-full h-9 px-3 rounded-md border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="0" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Type</label>
+                    <select value={paymentForm.type} onChange={e => setPaymentForm(f => ({...f, type: e.target.value}))} className="w-full h-9 px-3 rounded-md border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                      <option value="advance">Advance</option>
+                      <option value="balance">Balance</option>
+                      <option value="milestone">Milestone</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Payment Mode</label>
+                    <select value={paymentForm.paymentMode} onChange={e => setPaymentForm(f => ({...f, paymentMode: e.target.value}))} className="w-full h-9 px-3 rounded-md border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                      <option value="">Select mode</option>
+                      <option value="NEFT">NEFT</option>
+                      <option value="RTGS">RTGS</option>
+                      <option value="UPI">UPI</option>
+                      <option value="Cheque">Cheque</option>
+                      <option value="Cash">Cash</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">UTR / Reference Number</label>
+                    <input type="text" value={paymentForm.utrNumber} onChange={e => setPaymentForm(f => ({...f, utrNumber: e.target.value}))} className="w-full h-9 px-3 rounded-md border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="UTR or cheque number" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Bank Account</label>
+                    <input type="text" value={paymentForm.bankAccount} onChange={e => setPaymentForm(f => ({...f, bankAccount: e.target.value}))} className="w-full h-9 px-3 rounded-md border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g. HDFC - 1234" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Date</label>
+                    <input type="date" value={paymentForm.date} onChange={e => setPaymentForm(f => ({...f, date: e.target.value}))} className="w-full h-9 px-3 rounded-md border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Notes</label>
+                    <textarea value={paymentForm.notes} onChange={e => setPaymentForm(f => ({...f, notes: e.target.value}))} className="w-full px-3 py-2 rounded-md border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" rows={2} placeholder="Optional notes" />
+                  </div>
+                </div>
+                <button onClick={submitPayment} disabled={savingPayment || !paymentForm.amount} className="px-5 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-60">
+                  {savingPayment ? 'Saving...' : 'Record Payment'}
+                </button>
+              </CardContent>
+            </Card>
+          )}
           {deal.payments.length === 0 ? <p className="text-gray-400 text-sm text-center py-4">No payments recorded</p> : (
             <div className="space-y-2">{deal.payments.map((payment: any) => (
               <div key={payment.id} className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 bg-white">
                 <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center"><DollarSign className="w-4 h-4 text-green-600" /></div>
                 <div className="flex-1">
                   <p className="text-sm font-medium text-gray-900">{formatCurrency(payment.amount)}</p>
-                  <p className="text-xs text-gray-500">{payment.type} &middot; {formatDate(payment.date)}</p>
+                  <p className="text-xs text-gray-500">{payment.type} &middot; {formatDate(payment.date)}{payment.paymentMode ? ` · ${payment.paymentMode}` : ''}</p>
+                  {payment.utrNumber && <p className="text-xs text-gray-400 mt-0.5">Ref: {payment.utrNumber}</p>}
+                  {payment.bankAccount && <p className="text-xs text-gray-400">Bank: {payment.bankAccount}</p>}
                   {payment.notes && <p className="text-xs text-gray-400 mt-0.5">{payment.notes}</p>}
                 </div>
               </div>
@@ -664,11 +778,34 @@ export default function DealDetailPage() {
       {logType && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <Card className="w-full max-w-md mx-4">
-            <CardHeader><CardTitle className="text-base">Log {logType === 'call' ? 'Call' : 'Email'}</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-base">{logType === 'negotiation' ? 'Log Negotiation / Discussion' : `Log ${logType === 'call' ? 'Call' : 'Email'}`}</CardTitle></CardHeader>
             <CardContent className="space-y-3">
-              <Textarea placeholder={`Describe the ${logType}...`} value={logContent} onChange={e => setLogContent(e.target.value)} rows={4} />
+              {logType === 'negotiation' && (
+                <>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Type</label>
+                    <select value={logSubType} onChange={e => setLogSubType(e.target.value)} className="w-full h-9 px-3 rounded-md border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                      <option value="call">Call</option>
+                      <option value="email">Email</option>
+                      <option value="negotiation">Negotiation</option>
+                      <option value="meeting">Meeting</option>
+                      <option value="whatsapp">WhatsApp</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Outcome</label>
+                    <select value={logOutcome} onChange={e => setLogOutcome(e.target.value)} className="w-full h-9 px-3 rounded-md border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                      <option value="positive">Positive</option>
+                      <option value="neutral">Neutral</option>
+                      <option value="negative">Negative</option>
+                      <option value="deal_at_risk">Deal at Risk</option>
+                    </select>
+                  </div>
+                </>
+              )}
+              <Textarea placeholder={logType === 'negotiation' ? 'What was discussed / agreed?' : `Describe the ${logType}...`} value={logContent} onChange={e => setLogContent(e.target.value)} rows={4} />
               <div className="flex gap-2 justify-end">
-                <Button variant="outline" onClick={() => { setLogType(null); setLogContent('') }}>Cancel</Button>
+                <Button variant="outline" onClick={() => { setLogType(null); setLogContent(''); setLogOutcome('neutral'); setLogSubType('negotiation') }}>Cancel</Button>
                 <Button onClick={logActivity} disabled={loggingActivity || !logContent.trim()}>{loggingActivity ? 'Saving...' : 'Save'}</Button>
               </div>
             </CardContent>

@@ -22,8 +22,8 @@ function DealCard({ deal }: { deal: any }) {
         <CardContent className="p-5">
           <div className="flex items-start justify-between mb-3">
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-gray-900 truncate">{deal.customerName}</p>
-              <p className="text-xs text-gray-400 mt-0.5">{deal.customerCompany}</p>
+              <p className="font-semibold text-gray-900 truncate">{deal.customerCompany}</p>
+              <p className="text-xs text-gray-400 mt-0.5">{deal.customerName}</p>
             </div>
             <div className="flex flex-col items-end gap-1 ml-2">
               <HeatBadge score={deal.heatScore} />

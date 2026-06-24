@@ -16,12 +16,14 @@ interface Deal {
   advanceAmount?: number
   advanceReceived: boolean
   advanceDate?: string
+  advanceDeadline?: string
   balanceAmount?: number
   balancePaid: boolean
   balanceDate?: string
   updatedAt: string
   createdAt: string
   payments: any[]
+  paymentTerms?: string
 }
 
 function daysSince(date: string) {
@@ -139,6 +141,16 @@ export default function AccountsPage() {
     !d.advanceReceived
   ).length
 
+  // Pipeline summary
+  const totalPipelineValue = deals
+    .filter(d => !['closed_lost'].includes(d.stage))
+    .reduce((sum, d) => sum + (d.quotedAmount || 0), 0)
+  const totalReceived = payments.reduce((sum, p) => sum + p.amount, 0)
+  const totalPending = totalPipelineValue - totalReceived
+  const overdueAdvances = deals.filter(d =>
+    d.advanceDeadline && !d.advanceReceived && new Date(d.advanceDeadline) < now
+  ).length
+
   // Sections
   const advancePending = deals.filter(d =>
     ['pi_sent', 'approval_pending', 'production', 'dispatch_ready', 'dispatched'].includes(d.stage) &&
@@ -161,6 +173,34 @@ export default function AccountsPage() {
         <Button onClick={exportTally} variant="outline">
           <Download className="w-4 h-4 mr-2" /> Export for Tally
         </Button>
+      </div>
+
+      {/* Pipeline summary */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-gray-500">Total Pipeline</p>
+            <p className="text-xl font-bold text-gray-900 mt-1">{formatCurrency(totalPipelineValue)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-gray-500">Total Received</p>
+            <p className="text-xl font-bold text-green-700 mt-1">{formatCurrency(totalReceived)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-gray-500">Total Pending</p>
+            <p className="text-xl font-bold text-red-600 mt-1">{formatCurrency(Math.max(0, totalPending))}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-gray-500">Overdue Advances</p>
+            <p className={`text-xl font-bold mt-1 ${overdueAdvances > 0 ? 'text-red-600' : 'text-gray-400'}`}>{overdueAdvances}</p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Stats row */}
@@ -322,10 +362,11 @@ export default function AccountsPage() {
                   <tr className="border-b border-gray-200 text-gray-500">
                     <th className="pb-2 text-left font-medium">Date</th>
                     <th className="pb-2 text-left font-medium">Deal</th>
-                    <th className="pb-2 text-left font-medium">Customer</th>
+                    <th className="pb-2 text-left font-medium">Company</th>
                     <th className="pb-2 text-left font-medium">Type</th>
                     <th className="pb-2 text-left font-medium">Amount</th>
-                    <th className="pb-2 text-left font-medium">Notes</th>
+                    <th className="pb-2 text-left font-medium">Mode</th>
+                    <th className="pb-2 text-left font-medium">UTR</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -334,8 +375,8 @@ export default function AccountsPage() {
                       <td className="py-3 text-gray-500">{formatDate(p.date)}</td>
                       <td className="py-3 font-mono text-xs text-gray-500">{p.deal?.dealNumber}</td>
                       <td className="py-3">
-                        <p className="font-medium text-gray-900">{p.deal?.customerName}</p>
-                        <p className="text-xs text-gray-400">{p.deal?.customerCompany}</p>
+                        <p className="font-medium text-gray-900">{p.deal?.customerCompany}</p>
+                        <p className="text-xs text-gray-400">{p.deal?.customerName}</p>
                       </td>
                       <td className="py-3">
                         <span className={`capitalize text-xs px-2 py-0.5 rounded-full ${
@@ -345,7 +386,8 @@ export default function AccountsPage() {
                         }`}>{p.type}</span>
                       </td>
                       <td className="py-3 font-medium text-green-700">{formatCurrency(p.amount)}</td>
-                      <td className="py-3 text-gray-400 text-xs">{p.notes || '—'}</td>
+                      <td className="py-3 text-gray-500 text-xs">{p.paymentMode || '—'}</td>
+                      <td className="py-3 text-gray-400 text-xs">{p.utrNumber || '—'}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -14,36 +14,53 @@ export async function POST(req: NextRequest) {
     : productInterest === 'other' ? 'Product'
     : 'Air Shower'
 
-  const email = `Subject: Re: Enquiry for ${product} – SAM PRODUCTS Pvt. Ltd.
+  const apiKey = process.env.ANTHROPIC_API_KEY
 
-Dear ${customerName || "Sir/Ma'am"},
+  if (apiKey) {
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5',
+          max_tokens: 300,
+          system: "You are a sales assistant for SAM PRODUCTS Pvt. Ltd., manufacturers of Air Showers and Cleanroom solutions. Write a SHORT professional introduction email (3-4 sentences, no more than 100 words). It should: introduce SAM PRODUCTS briefly, acknowledge the customer's requirement, mention that TDS/specs document is being shared, and invite them to discuss further. Sign off as 'Team SAM PRODUCTS'. Do not include subject line, filler phrases, or long paragraphs.",
+          messages: [
+            {
+              role: 'user',
+              content: `Write a short intro email for:
+Customer: ${customerName || "Sir/Ma'am"}
+Company: ${customerCompany || 'their organisation'}
+Product: ${product}
+${querySummary ? `Requirement: ${querySummary}` : ''}
+${timeline === 'urgent' ? 'Note: Requirement is urgent.' : ''}`
+            }
+          ]
+        })
+      })
 
-Thank you for reaching out to SAM PRODUCTS Pvt. Ltd.${querySummary ? ` We are pleased to receive your enquiry regarding ${querySummary}.` : '.'}
+      if (response.ok) {
+        const data = await response.json()
+        const emailText = data.content?.[0]?.text || ''
+        if (emailText) return NextResponse.json({ email: emailText })
+      }
+    } catch {
+      // Fall through to template
+    }
+  }
 
-We have been manufacturing high-quality Air Showers, Air Curtains, and Clean Room solutions since 1992, supplying to leading companies across pharmaceuticals, electronics, food processing, and defence sectors pan-India.
+  // Fallback template
+  const urgentNote = timeline === 'urgent' ? '\n\nWe note that your requirement is urgent and assure you of priority attention.' : ''
+  const email = `Dear ${customerName || "Sir/Ma'am"},
 
-As a first step, please find attached:
-1. Company Profile – SAM PRODUCTS Pvt. Ltd.
-2. Product Brochure – ${product}s & Clean Room Solutions
-3. Customer Reference List (partial)
+Thank you for your enquiry regarding ${product}s. SAM PRODUCTS Pvt. Ltd. has been manufacturing premium Air Showers and Cleanroom solutions since 1992, serving clients across pharma, electronics, and defence sectors. Please find our TDS and product specifications attached for your review.${urgentNote} We would be glad to schedule a call and discuss your specific requirements.
 
-To help us prepare a suitable technical proposal, we request you to share:
-• Required dimensions (Length × Width × Height in mm)
-• Material preference (MS / SS 304 / SS 202)
-• Number of persons to use the Air Shower simultaneously
-• Any specific technical or compliance requirements${timeline === 'urgent' ? '\n\nWe note that your requirement is urgent and assure you of our priority attention.' : ''}
-
-We would also be happy to schedule a call at your convenience to understand your requirement better and walk you through our product range.
-
-We look forward to the opportunity to work with ${customerCompany || 'your organisation'}.
-
-Warm Regards,
-
-[Your Name]
-SAM PRODUCTS Pvt. Ltd.
-B-137, Noida Rd, B Block, Sector 6, Noida – 201 301, U.P., INDIA
-Ph: +91-9810065139 | Email: samproducts1992@gmail.com
-Web: www.samproducts.net | GSTIN: 09AAKCS6327D1Z8`
+Team SAM PRODUCTS
+SAM PRODUCTS Pvt. Ltd. | +91-9810065139 | samproducts1992@gmail.com`
 
   return NextResponse.json({ email })
 }

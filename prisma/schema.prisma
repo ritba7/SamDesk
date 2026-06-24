@@ -122,6 +122,13 @@ model Deal {
   internalNotes     String?
   expectedCloseDate DateTime?
 
+  // Terms
+  paymentTerms     String?   // e.g. "50% advance, 50% before dispatch"
+  freightTerms     String?   // detailed freight terms
+  inspectionTerms  String?   // "waiver" or custom terms
+  introEmail       String?   // stored auto-generated intro email
+  tdsDeadline      DateTime? // deadline for sending TDS
+
   // Flags
   inspectionType  String?  // physical, waiver
   installationDone Boolean @default(false)

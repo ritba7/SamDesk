@@ -8,7 +8,7 @@ import {
   Flame, Thermometer, Snowflake, ChevronRight,
   Activity, DollarSign, Factory, Calendar,
   MessageSquare, AlertCircle, Check, Download,
-  Shield, Phone, Mail as MailIcon
+  Shield, Phone, Mail as MailIcon, Pencil, Copy
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -43,6 +43,26 @@ export default function DealDetailPage() {
   const [fuNote, setFuNote] = useState('')
   const [fuSaving, setFuSaving] = useState(false)
 
+  // GST quick-fill
+  const [gstInput, setGstInput] = useState('')
+  const [savingGst, setSavingGst] = useState(false)
+
+  // Quoted amount edit
+  const [editingQuote, setEditingQuote] = useState(false)
+  const [quoteInput, setQuoteInput] = useState('')
+  const [savingQuote, setSavingQuote] = useState(false)
+
+  // Task deadline editing
+  const [editingTaskDue, setEditingTaskDue] = useState<string | null>(null)
+  const [taskDueInput, setTaskDueInput] = useState('')
+
+  // Production deadline editing
+  const [editingProdDue, setEditingProdDue] = useState<string | null>(null)
+  const [prodDueInput, setProdDueInput] = useState('')
+
+  // Intro email copy
+  const [emailCopied, setEmailCopied] = useState(false)
+
   const user = session?.user as any
   const role = user?.role
 
@@ -74,6 +94,18 @@ export default function DealDetailPage() {
     await fetchDeal()
   }
 
+  const updateTaskDueDate = async (taskId: string, dueDate: string) => {
+    await fetch(`/api/tasks/${taskId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dueDate: new Date(dueDate).toISOString() }) })
+    setEditingTaskDue(null)
+    await fetchDeal()
+  }
+
+  const updateProdDeadline = async (stageId: string, plannedEnd: string) => {
+    await fetch(`/api/production/${stageId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plannedEnd: new Date(plannedEnd).toISOString() }) })
+    setEditingProdDue(null)
+    await fetchDeal()
+  }
+
   const logActivity = async () => {
     if (!logContent.trim() || !logType) return
     setLoggingActivity(true)
@@ -101,6 +133,35 @@ export default function DealDetailPage() {
     await fetchDeal()
   }
 
+  const saveGst = async () => {
+    if (!gstInput.trim()) return
+    setSavingGst(true)
+    await fetch(`/api/deals/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ gstNumber: gstInput }) })
+    // Auto-create reminder task for sales
+    const salesUser = users.find((u: any) => u.role === 'sales')
+    if (salesUser) {
+      const due = new Date(); due.setDate(due.getDate() + 1)
+      await fetch('/api/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dealId: id, title: `Confirm GST number with customer — ${deal?.customerName}`, assignedToId: salesUser.id, dueDate: due.toISOString(), type: 'follow_up' }) })
+    }
+    setGstInput('')
+    setSavingGst(false)
+    await fetchDeal()
+  }
+
+  const saveQuotedAmount = async () => {
+    if (!quoteInput) return
+    setSavingQuote(true)
+    await fetch(`/api/deals/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ quotedAmount: parseFloat(quoteInput) }) })
+    setSavingQuote(false)
+    setEditingQuote(false)
+    await fetchDeal()
+  }
+
+  const markIntroEmailSent = async () => {
+    await fetch('/api/activities', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dealId: id, type: 'email', content: 'Intro email sent to customer' }) })
+    await fetchDeal()
+  }
+
   if (loading) return <div className="flex items-center justify-center h-48 text-gray-400">Loading...</div>
   if (!deal) return <div className="text-center py-12"><p className="text-gray-400">Deal not found</p><Link href="/dashboard/deals"><Button className="mt-4" variant="outline">Back to Deals</Button></Link></div>
 
@@ -112,6 +173,8 @@ export default function DealDetailPage() {
   const canUpdateProduction = ['director', 'manufacturing'].includes(role)
   const totalPaid = deal.payments.reduce((sum: number, p: any) => sum + p.amount, 0)
   const pendingTasks = deal.tasks.filter((t: any) => t.status === 'pending')
+
+  const hasSpecs = deal.material || deal.motorType || deal.outerWidth || deal.innerWidth || deal.freightPaidBy || deal.installationType || deal.paymentTerms || deal.freightTerms || deal.inspectionTerms
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
@@ -174,7 +237,26 @@ export default function DealDetailPage() {
       )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card><CardContent className="p-4"><p className="text-xs text-gray-500">Quoted Amount</p><p className="text-lg font-bold text-gray-900">{deal.quotedAmount ? formatCurrency(deal.quotedAmount) : '—'}</p></CardContent></Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-gray-500">Quoted Amount</p>
+            <div className="flex items-center gap-2">
+              <p className="text-lg font-bold text-gray-900">{deal.quotedAmount ? formatCurrency(deal.quotedAmount) : '—'}</p>
+              {canEdit && !editingQuote && (
+                <button onClick={() => { setEditingQuote(true); setQuoteInput(deal.quotedAmount ? String(deal.quotedAmount) : '') }} className="text-gray-400 hover:text-blue-600">
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+            {editingQuote && (
+              <div className="flex gap-1 mt-1">
+                <input type="number" value={quoteInput} onChange={e => setQuoteInput(e.target.value)} className="w-24 h-7 px-2 text-xs border border-gray-300 rounded" placeholder="Amount" />
+                <button onClick={saveQuotedAmount} disabled={savingQuote} className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">{savingQuote ? '...' : 'Save'}</button>
+                <button onClick={() => setEditingQuote(false)} className="text-xs px-2 py-1 border border-gray-300 rounded hover:bg-gray-50">×</button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
         <Card><CardContent className="p-4"><p className="text-xs text-gray-500">Total Received</p><p className="text-lg font-bold text-green-700">{formatCurrency(totalPaid)}</p></CardContent></Card>
         <Card><CardContent className="p-4"><p className="text-xs text-gray-500">Pending Tasks</p><p className="text-lg font-bold text-amber-600">{pendingTasks.length}</p></CardContent></Card>
         <Card><CardContent className="p-4"><p className="text-xs text-gray-500">Expected Dispatch</p><p className="text-lg font-bold text-gray-900">{deal.expectedDispatch ? formatDate(deal.expectedDispatch) : '—'}</p></CardContent></Card>
@@ -192,6 +274,26 @@ export default function DealDetailPage() {
         </TabsList>
 
         <TabsContent value="overview" className="mt-4 space-y-4">
+          {/* GST banner */}
+          {!deal.gstNumber && canEdit && (
+            <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-4">
+              <p className="text-yellow-800 font-medium text-sm mb-2">GST number not filled — add it now</p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={gstInput}
+                  onChange={e => setGstInput(e.target.value)}
+                  placeholder="22AAAAA0000A1Z5"
+                  maxLength={15}
+                  className="flex-1 h-9 px-3 rounded-md border border-yellow-300 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400 bg-white"
+                />
+                <button onClick={saveGst} disabled={savingGst || !gstInput.trim()} className="px-4 py-2 bg-yellow-600 text-white rounded-md text-sm font-medium hover:bg-yellow-700 disabled:opacity-60">
+                  {savingGst ? 'Saving...' : 'Verify & Save'}
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card><CardHeader><CardTitle className="text-sm">Customer Details</CardTitle></CardHeader>
               <CardContent className="space-y-2 text-sm">
@@ -203,14 +305,78 @@ export default function DealDetailPage() {
             </Card>
             <Card><CardHeader><CardTitle className="text-sm">Product Specs</CardTitle></CardHeader>
               <CardContent className="space-y-2 text-sm">
-                {deal.material && <div className="flex justify-between"><span className="text-gray-500">Material</span><span className="uppercase">{deal.material}</span></div>}
-                {deal.motorType && <div className="flex justify-between"><span className="text-gray-500">Motor</span><span className="uppercase">{deal.motorType} - {deal.motorBrand === 'other' ? deal.motorBrandOther : deal.motorBrand}</span></div>}
-                {deal.outerWidth && <div className="flex justify-between"><span className="text-gray-500">Outer (W×H×D)</span><span>{deal.outerWidth}×{deal.outerHeight}×{deal.outerDepth} mm</span></div>}
-                {deal.innerWidth && <div className="flex justify-between"><span className="text-gray-500">Inner (W×H×D)</span><span>{deal.innerWidth}×{deal.innerHeight}×{deal.innerDepth} mm</span></div>}
-                {deal.freightPaidBy && <div className="flex justify-between"><span className="text-gray-500">Freight</span><span className="capitalize">{deal.freightPaidBy}</span></div>}
+                {hasSpecs ? (
+                  <>
+                    {deal.material && <div className="flex justify-between"><span className="text-gray-500">Material</span><span className="uppercase">{deal.material}</span></div>}
+                    {deal.motorType && <div className="flex justify-between"><span className="text-gray-500">Motor</span><span className="uppercase">{deal.motorType}{deal.motorBrand ? ` — ${deal.motorBrand === 'other' ? deal.motorBrandOther : deal.motorBrand}` : ''}</span></div>}
+                    {deal.outerWidth && <div className="flex justify-between"><span className="text-gray-500">Outer (W×H×D)</span><span>{deal.outerWidth}×{deal.outerHeight}×{deal.outerDepth} mm</span></div>}
+                    {deal.innerWidth && <div className="flex justify-between"><span className="text-gray-500">Inner (W×H×D)</span><span>{deal.innerWidth}×{deal.innerHeight}×{deal.innerDepth} mm</span></div>}
+                    {deal.freightPaidBy && <div className="flex justify-between"><span className="text-gray-500">Freight</span><span className="capitalize">{deal.freightPaidBy.replace(/_/g, ' ')}</span></div>}
+                    {deal.installationType && <div className="flex justify-between"><span className="text-gray-500">Installation</span><span className="capitalize">{deal.installationType}</span></div>}
+                    {deal.paymentTerms && <div className="flex justify-between"><span className="text-gray-500">Payment Terms</span><span className="text-right max-w-[60%]">{deal.paymentTerms}</span></div>}
+                    {deal.freightTerms && <div className="flex justify-between"><span className="text-gray-500">Freight Terms</span><span className="text-right max-w-[60%]">{deal.freightTerms}</span></div>}
+                    {deal.inspectionTerms && <div className="flex justify-between"><span className="text-gray-500">Inspection</span><span className="capitalize">{deal.inspectionTerms.replace(/_/g, ' ')}</span></div>}
+                  </>
+                ) : (
+                  <p className="text-gray-400 text-sm">Product specs not filled yet</p>
+                )}
               </CardContent>
             </Card>
           </div>
+
+          {/* Intro Email card */}
+          {deal.introEmail && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm">Intro Email (Auto-drafted)</CardTitle>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(deal.introEmail); setEmailCopied(true); setTimeout(() => setEmailCopied(false), 2000) }}
+                      className="flex items-center gap-1 text-xs px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50"
+                    >
+                      <Copy className="w-3 h-3" />{emailCopied ? 'Copied!' : 'Copy'}
+                    </button>
+                    <button
+                      onClick={markIntroEmailSent}
+                      className="flex items-center gap-1 text-xs px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                    >
+                      <Check className="w-3 h-3" />Mark as Sent
+                    </button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans bg-gray-50 rounded-lg p-3 overflow-auto max-h-48">{deal.introEmail}</pre>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Pending tasks mini-list */}
+          {pendingTasks.length > 0 && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm">Pending Tasks</CardTitle>
+                  <span className="text-xs text-gray-400">{pendingTasks.length} pending</span>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {pendingTasks.slice(0, 5).map((task: any) => (
+                  <div key={task.id} className="flex items-center gap-3 text-sm">
+                    <button onClick={() => markTaskDone(task.id)} className="w-4 h-4 rounded border border-gray-300 hover:border-green-500 flex-shrink-0 flex items-center justify-center">
+                      <Check className="w-2.5 h-2.5 text-green-600 opacity-0 hover:opacity-100" />
+                    </button>
+                    <span className="flex-1 truncate text-gray-800">{task.title}</span>
+                    <span className="text-xs text-gray-400">{task.assignedTo?.name}</span>
+                    {task.dueDate && <span className={`text-xs ${new Date(task.dueDate) < new Date() ? 'text-red-500' : 'text-gray-400'}`}>{formatDate(task.dueDate)}</span>}
+                  </div>
+                ))}
+                {pendingTasks.length > 5 && <p className="text-xs text-blue-600 mt-1">+{pendingTasks.length - 5} more — see Tasks tab</p>}
+              </CardContent>
+            </Card>
+          )}
+
           <Card><CardHeader><CardTitle className="text-sm">Communication Log</CardTitle></CardHeader>
             <CardContent>
               {deal.activities.filter((a: any) => a.type === 'call' || a.type === 'email').length === 0 ? (
@@ -295,7 +461,53 @@ export default function DealDetailPage() {
                 {task.description && <p className="text-xs text-gray-500 mt-0.5">{task.description}</p>}
                 <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-400">
                   <span>{task.assignedTo?.name}</span>
-                  {task.dueDate && <span className={new Date(task.dueDate) < new Date() ? 'text-red-500 font-medium' : ''}>Due {formatDate(task.dueDate)}</span>}
+                  <div className="flex items-center gap-1">
+                    {task.dueDate && (
+                      <>
+                        {editingTaskDue === task.id ? (
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="date"
+                              value={taskDueInput}
+                              onChange={e => setTaskDueInput(e.target.value)}
+                              className="h-6 px-1 text-xs border border-gray-300 rounded"
+                            />
+                            <button onClick={() => updateTaskDueDate(task.id, taskDueInput)} className="text-xs text-blue-600 hover:underline">Save</button>
+                            <button onClick={() => setEditingTaskDue(null)} className="text-xs text-gray-400 hover:underline">Cancel</button>
+                          </div>
+                        ) : (
+                          <>
+                            <span className={new Date(task.dueDate) < new Date() ? 'text-red-500 font-medium' : ''}>Due {formatDate(task.dueDate)}</span>
+                            {canEdit && (
+                              <button onClick={() => { setEditingTaskDue(task.id); setTaskDueInput(new Date(task.dueDate).toISOString().split('T')[0]) }} className="text-gray-300 hover:text-blue-500 ml-1">
+                                <Pencil className="w-3 h-3" />
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </>
+                    )}
+                    {!task.dueDate && canEdit && (
+                      <>
+                        {editingTaskDue === task.id ? (
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="date"
+                              value={taskDueInput}
+                              onChange={e => setTaskDueInput(e.target.value)}
+                              className="h-6 px-1 text-xs border border-gray-300 rounded"
+                            />
+                            <button onClick={() => updateTaskDueDate(task.id, taskDueInput)} className="text-xs text-blue-600 hover:underline">Save</button>
+                            <button onClick={() => setEditingTaskDue(null)} className="text-xs text-gray-400 hover:underline">Cancel</button>
+                          </div>
+                        ) : (
+                          <button onClick={() => { setEditingTaskDue(task.id); setTaskDueInput('') }} className="text-gray-300 hover:text-blue-500">
+                            <Pencil className="w-3 h-3" />
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -319,8 +531,30 @@ export default function DealDetailPage() {
                   </div>
                   <div className="flex-1">
                     <p className="text-sm font-medium text-gray-900">{meta?.label || stage.stageName}</p>
-                    <div className="flex gap-3 text-xs text-gray-500 mt-0.5">
-                      {stage.plannedEnd && <span>Planned: {formatDate(stage.plannedEnd)}</span>}
+                    <div className="flex gap-3 text-xs text-gray-500 mt-0.5 flex-wrap items-center">
+                      {stage.plannedEnd && (
+                        <span className="flex items-center gap-1">
+                          Planned: {formatDate(stage.plannedEnd)}
+                          {canUpdateProduction && (
+                            editingProdDue === stage.id ? (
+                              <span className="flex items-center gap-1 ml-1">
+                                <input
+                                  type="date"
+                                  value={prodDueInput}
+                                  onChange={e => setProdDueInput(e.target.value)}
+                                  className="h-5 px-1 text-xs border border-gray-300 rounded"
+                                />
+                                <button onClick={() => updateProdDeadline(stage.id, prodDueInput)} className="text-blue-600 hover:underline">Save</button>
+                                <button onClick={() => setEditingProdDue(null)} className="text-gray-400 hover:underline">×</button>
+                              </span>
+                            ) : (
+                              <button onClick={() => { setEditingProdDue(stage.id); setProdDueInput(new Date(stage.plannedEnd).toISOString().split('T')[0]) }} className="text-gray-300 hover:text-blue-500 ml-1">
+                                <Pencil className="w-2.5 h-2.5" />
+                              </button>
+                            )
+                          )}
+                        </span>
+                      )}
                       {stage.actualStart && <span>Started: {formatDate(stage.actualStart)}</span>}
                       {stage.actualEnd && <span>Completed: {formatDate(stage.actualEnd)}</span>}
                     </div>
@@ -374,7 +608,7 @@ export default function DealDetailPage() {
                   <div className="flex-1"><p className="text-sm font-medium text-gray-900">Quotation</p><p className="text-xs text-gray-500 mt-0.5">Generate a quote PDF in SAM PRODUCTS format.</p></div>
                   <Button size="sm" onClick={() => generateQuote(deal)} className="flex items-center gap-1.5"><Download className="w-3.5 h-3.5" />Generate Quote</Button>
                 </div>
-                {STAGE_FLOW.indexOf(deal.stage) >= STAGE_FLOW.indexOf('pi_sent') && (
+                {canEdit && (
                   <div className="flex items-start gap-4 p-4 rounded-lg border border-gray-200 bg-white">
                     <FileText className="w-8 h-8 text-green-500 flex-shrink-0 mt-0.5" />
                     <div className="flex-1"><p className="text-sm font-medium text-gray-900">Proforma Invoice (PI)</p><p className="text-xs text-gray-500 mt-0.5">Generate a PI with {deal.customerState === 'Uttar Pradesh' ? 'CGST + SGST (9% + 9%)' : 'IGST (18%)'} — HSN 84145930.</p></div>

@@ -25,6 +25,7 @@ export default function NewDealPage() {
   const [step, setStep] = useState(1)
   const [users, setUsers] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
+  const [savingStep1, setSavingStep1] = useState(false)
   const [gstLoading, setGstLoading] = useState(false)
   const [gstResult, setGstResult] = useState<GstResult | null>(null)
   const [generatingEmail, setGeneratingEmail] = useState(false)
@@ -49,6 +50,7 @@ export default function NewDealPage() {
     innerWidth: '', innerHeight: '', innerDepth: '',
     freightPaidBy: '', installationType: '', heatScore: 'warm',
     quotedAmount: '', gstRate: '18',
+    paymentTerms: '', freightTerms: '', inspectionTerms: '', introEmail: '', tdsDeadline: '',
   })
 
   useEffect(() => {
@@ -106,7 +108,9 @@ export default function NewDealPage() {
         })
       })
       const data = await res.json()
-      setGeneratedEmail(data.email || '')
+      const email = data.email || ''
+      setGeneratedEmail(email)
+      setForm(f => ({ ...f, introEmail: email }))
     } finally {
       setGeneratingEmail(false)
     }
@@ -118,6 +122,42 @@ export default function NewDealPage() {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  const handleSaveStep1 = async () => {
+    if (!form.customerName || !form.customerCompany) {
+      alert('Customer Name and Company are required')
+      return
+    }
+    setSavingStep1(true)
+    try {
+      const body: any = {
+        customerName: form.customerName,
+        customerCompany: form.customerCompany,
+        customerEmail: form.customerEmail || undefined,
+        customerPhone: form.customerPhone || undefined,
+        customerAddress: form.customerAddress || undefined,
+        customerState: form.customerState || undefined,
+        gstNumber: form.gstNumber || undefined,
+        source: form.source || undefined,
+        verificationScore,
+        verificationData: JSON.stringify(manualChecks),
+        assignedToId: form.assignedToId || undefined,
+      }
+      const res = await fetch('/api/deals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      })
+      if (res.ok) {
+        const deal = await res.json()
+        router.push(`/dashboard/deals/${deal.id}`)
+      } else {
+        alert('Failed to save deal')
+      }
+    } finally {
+      setSavingStep1(false)
+    }
+  }
+
   const handleSubmit = async () => {
     setLoading(true)
     try {
@@ -125,6 +165,7 @@ export default function NewDealPage() {
         ...form,
         verificationScore,
         verificationData: JSON.stringify(manualChecks),
+        introEmail: form.introEmail || generatedEmail || undefined,
       }
       // Strip fields not in schema
       delete body.website
@@ -140,6 +181,7 @@ export default function NewDealPage() {
       if (body.budgetIndication) body.budgetIndication = parseFloat(body.budgetIndication)
       if (!body.assignedToId) delete body.assignedToId
       if (!body.expectedDispatch) delete body.expectedDispatch
+      if (!body.tdsDeadline) delete body.tdsDeadline
       const res = await fetch('/api/deals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -178,7 +220,7 @@ export default function NewDealPage() {
         </div>
       ))}
       <div className="ml-4 text-sm text-gray-500">
-        {step === 1 ? 'Customer & Verification' : step === 2 ? 'Query Details & Email' : 'Assignment'}
+        {step === 1 ? 'Customer & Verification' : step === 2 ? 'Query, Specs & Email' : 'Assignment & Deadlines'}
       </div>
     </div>
   )
@@ -307,7 +349,16 @@ export default function NewDealPage() {
             </div>
           </div>
 
-          <div className="flex justify-end pt-2">
+          <div className="flex justify-between pt-2">
+            <button
+              type="button"
+              onClick={handleSaveStep1}
+              disabled={savingStep1}
+              className="flex items-center gap-2 px-5 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-70"
+            >
+              {savingStep1 && <Loader2 className="w-4 h-4 animate-spin" />}
+              Save & Continue Later
+            </button>
             <button
               type="button"
               onClick={() => {
@@ -327,7 +378,7 @@ export default function NewDealPage() {
 
       {step === 2 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-5">
-          <h2 className="text-base font-semibold text-gray-900 mb-4">Query Details & Email Draft</h2>
+          <h2 className="text-base font-semibold text-gray-900 mb-4">Query, Specs & Email Draft</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className={labelCls}>Product Interest</label>
@@ -366,6 +417,105 @@ export default function NewDealPage() {
             </div>
           </div>
 
+          {/* Product Specifications */}
+          <div className="border-t border-gray-100 pt-5">
+            <h3 className="text-sm font-semibold text-gray-800 mb-3">Product Specifications</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className={labelCls}>Material</label>
+                <select name="material" value={form.material} onChange={handleChange} className={inputCls}>
+                  <option value="">Select material</option>
+                  <option value="ms">MS</option>
+                  <option value="ss304">SS304</option>
+                  <option value="ss202">SS202</option>
+                  <option value="ms+ss202">MS + SS202</option>
+                  <option value="ms+ss304">MS + SS304</option>
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>Motor Type</label>
+                <select name="motorType" value={form.motorType} onChange={handleChange} className={inputCls}>
+                  <option value="">Select motor type</option>
+                  <option value="ie2">IE2</option>
+                  <option value="ie3">IE3</option>
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>Motor Brand</label>
+                <select name="motorBrand" value={form.motorBrand} onChange={handleChange} className={inputCls}>
+                  <option value="">Select brand</option>
+                  <option value="siemens">Siemens</option>
+                  <option value="bharatbijli">Bharat Bijli</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              {form.motorBrand === 'other' && (
+                <div>
+                  <label className={labelCls}>Other brand name</label>
+                  <input name="motorBrandOther" value={form.motorBrandOther} onChange={handleChange} className={inputCls} placeholder="Brand name" />
+                </div>
+              )}
+              <div className="md:col-span-2">
+                <label className={labelCls}>Outer Dimensions (mm) — W × H × D</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <input name="outerWidth" type="number" value={form.outerWidth} onChange={handleChange} className={inputCls} placeholder="Width" />
+                  <input name="outerHeight" type="number" value={form.outerHeight} onChange={handleChange} className={inputCls} placeholder="Height" />
+                  <input name="outerDepth" type="number" value={form.outerDepth} onChange={handleChange} className={inputCls} placeholder="Depth" />
+                </div>
+              </div>
+              <div className="md:col-span-2">
+                <label className={labelCls}>Inner Dimensions (mm) — W × H × D</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <input name="innerWidth" type="number" value={form.innerWidth} onChange={handleChange} className={inputCls} placeholder="Width" />
+                  <input name="innerHeight" type="number" value={form.innerHeight} onChange={handleChange} className={inputCls} placeholder="Height" />
+                  <input name="innerDepth" type="number" value={form.innerDepth} onChange={handleChange} className={inputCls} placeholder="Depth" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Payment Terms */}
+          <div className="border-t border-gray-100 pt-5">
+            <h3 className="text-sm font-semibold text-gray-800 mb-3">Payment & Freight Terms</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="md:col-span-2">
+                <label className={labelCls}>Payment Terms</label>
+                <input name="paymentTerms" value={form.paymentTerms} onChange={handleChange} className={inputCls} placeholder="e.g. 50% advance, 50% before dispatch" />
+              </div>
+              <div>
+                <label className={labelCls}>Freight Terms</label>
+                <select name="freightPaidBy" value={form.freightPaidBy} onChange={handleChange} className={inputCls}>
+                  <option value="">Select</option>
+                  <option value="customer_bears">Customer Bears</option>
+                  <option value="company_bears">Company Bears</option>
+                  <option value="to_be_decided">To Be Decided</option>
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>Freight Detail</label>
+                <input name="freightTerms" value={form.freightTerms} onChange={handleChange} className={inputCls} placeholder="Additional freight details" />
+              </div>
+              <div>
+                <label className={labelCls}>Inspection Terms</label>
+                <select name="inspectionTerms" value={form.inspectionTerms} onChange={handleChange} className={inputCls}>
+                  <option value="">Select</option>
+                  <option value="waiver">Waiver</option>
+                  <option value="physical_inspection">Physical Inspection</option>
+                  <option value="as_per_agreement">As Per Agreement</option>
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>Installation Type</label>
+                <select name="installationType" value={form.installationType} onChange={handleChange} className={inputCls}>
+                  <option value="">Select</option>
+                  <option value="none">None</option>
+                  <option value="online">Online</option>
+                  <option value="onsite">Onsite</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
           <div className="border-t border-gray-100 pt-5">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold text-gray-800">Auto-Draft Introduction Email</h3>
@@ -383,9 +533,9 @@ export default function NewDealPage() {
               <div className="space-y-2">
                 <textarea
                   value={generatedEmail}
-                  onChange={e => setGeneratedEmail(e.target.value)}
+                  onChange={e => { setGeneratedEmail(e.target.value); setForm(f => ({ ...f, introEmail: e.target.value })) }}
                   className="w-full px-3 py-2 rounded-md border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
-                  rows={14}
+                  rows={10}
                 />
                 <button
                   type="button"
@@ -412,7 +562,7 @@ export default function NewDealPage() {
 
       {step === 3 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-5">
-          <h2 className="text-base font-semibold text-gray-900 mb-4">Assignment & Priority</h2>
+          <h2 className="text-base font-semibold text-gray-900 mb-4">Assignment & Deadlines</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className={labelCls}>Assigned To</label>
@@ -440,6 +590,10 @@ export default function NewDealPage() {
                 <option value="warm">Warm (Considering)</option>
                 <option value="cold">Cold (Early stage)</option>
               </select>
+            </div>
+            <div>
+              <label className={labelCls}>TDS Send Deadline</label>
+              <input name="tdsDeadline" type="date" value={form.tdsDeadline} onChange={handleChange} className={inputCls} />
             </div>
           </div>
 

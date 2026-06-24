@@ -7,8 +7,20 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const user = session.user as any
   const body = await req.json()
   const task = await prisma.task.update({ where: { id: params.id }, data: body })
+
+  // Log activity
+  await prisma.activity.create({
+    data: {
+      dealId: task.dealId || undefined,
+      userId: user.id,
+      type: 'task',
+      content: `Task "${task.title}" updated${body.status ? ` — marked ${body.status}` : ''}${body.dueDate ? ` — deadline changed to ${new Date(body.dueDate).toLocaleDateString('en-IN')}` : ''}`,
+    }
+  })
+
   return NextResponse.json(task)
 }
 

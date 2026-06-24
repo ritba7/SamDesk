@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { PRODUCTION_STAGES } from '@/lib/utils'
+import { FOLLOWUP_CONFIG } from '@/lib/followupConfig'
 import { addBusinessDays } from 'date-fns'
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
@@ -81,26 +82,35 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       }
     })
 
-    const followUpStages: Record<string, string> = {
-      tds_sent: 'Follow up with customer after TDS',
-      quote_sent: 'Follow up on quote',
-      pi_sent: 'Follow up on PI approval',
-      dispatched: 'Call customer to confirm receipt',
-    }
-
-    if (followUpStages[newStage] && deal.assignedToId) {
-      const dueDate = new Date()
-      dueDate.setDate(dueDate.getDate() + 3)
-      await prisma.task.create({
-        data: {
-          dealId: deal.id,
-          title: `${followUpStages[newStage]} - ${deal.customerName}`,
-          assignedToId: deal.assignedToId,
-          createdById: user.id,
-          dueDate,
-          type: 'follow_up',
+    // Auto follow-up task based on new stage
+    const followupCfg = FOLLOWUP_CONFIG.find(c => c.stage === newStage)
+    if (followupCfg) {
+      // Find the best user to assign: prefer deal's assignedTo if role matches, else find first matching user
+      let assigneeId: string | null = deal.assignedToId
+      if (assigneeId) {
+        const assignee = await prisma.user.findUnique({ where: { id: assigneeId }, select: { role: true } })
+        if (!assignee || !followupCfg.assignToRole.includes(assignee.role)) {
+          assigneeId = null
         }
-      })
+      }
+      if (!assigneeId) {
+        const matchingUser = await prisma.user.findFirst({ where: { role: { in: followupCfg.assignToRole } } })
+        assigneeId = matchingUser?.id || null
+      }
+      if (assigneeId) {
+        const dueDate = new Date()
+        dueDate.setDate(dueDate.getDate() + followupCfg.defaultDays)
+        await prisma.task.create({
+          data: {
+            dealId: deal.id,
+            title: `${followupCfg.taskTitle} — ${deal.customerName}`,
+            assignedToId: assigneeId,
+            createdById: user.id,
+            dueDate,
+            type: 'follow_up',
+          }
+        })
+      }
     }
 
     if (newStage === 'production') {

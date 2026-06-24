@@ -10,6 +10,7 @@ export async function GET() {
       { name: 'Accounts Head', email: 'accounts@samdesk.in', password: 'Accounts@123', role: 'accounts' },
       { name: 'Manufacturing Head', email: 'mfg@samdesk.in', password: 'Mfg@123456', role: 'manufacturing' },
       { name: 'Design Head', email: 'design@samdesk.in', password: 'Design@123', role: 'design' },
+      { name: 'Sales Executive', email: 'sales@samdesk.in', password: 'Sales@123', role: 'sales' },
     ]
 
     for (const u of users) {

@@ -37,6 +37,11 @@ export default function DealDetailPage() {
   const [logType, setLogType] = useState<'call'|'email'|null>(null)
   const [logContent, setLogContent] = useState('')
   const [loggingActivity, setLoggingActivity] = useState(false)
+  const [users, setUsers] = useState<any[]>([])
+  const [fuAssignee, setFuAssignee] = useState('')
+  const [fuDays, setFuDays] = useState(3)
+  const [fuNote, setFuNote] = useState('')
+  const [fuSaving, setFuSaving] = useState(false)
 
   const user = session?.user as any
   const role = user?.role
@@ -46,7 +51,10 @@ export default function DealDetailPage() {
     if (res.ok) setDeal(await res.json())
     setLoading(false)
   }
-  useEffect(() => { fetchDeal() }, [id])
+  useEffect(() => {
+    fetchDeal()
+    fetch('/api/users').then(r => r.json()).then(u => setUsers(Array.isArray(u) ? u : []))
+  }, [id])
 
   const changeStage = async (newStage: string) => {
     if (!deal) return; setStageLoading(true)
@@ -71,6 +79,21 @@ export default function DealDetailPage() {
     setLoggingActivity(true)
     await fetch('/api/activities', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dealId: id, type: logType, content: logContent }) })
     setLogContent(''); setLogType(null); await fetchDeal(); setLoggingActivity(false)
+  }
+
+  const submitFollowUp = async () => {
+    if (!fuAssignee || fuDays < 1) return
+    setFuSaving(true)
+    const dueDate = new Date()
+    dueDate.setDate(dueDate.getDate() + fuDays)
+    await fetch('/api/tasks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dealId: id, title: fuNote || `Follow-up — ${deal?.customerName}`, assignedToId: fuAssignee, dueDate: dueDate.toISOString(), type: 'follow_up', status: 'pending' })
+    })
+    setFuNote(''); setFuAssignee(''); setFuDays(3)
+    await fetchDeal()
+    setFuSaving(false)
   }
 
   const updateProductionStage = async (stageId: string, status: string) => {
@@ -207,6 +230,31 @@ export default function DealDetailPage() {
               )}
             </CardContent>
           </Card>
+          {canEdit && !isLost && !isWon && (
+            <Card>
+              <CardHeader><CardTitle className="text-sm">Set Manual Follow-up</CardTitle></CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <select value={fuAssignee} onChange={e => setFuAssignee(e.target.value)}
+                    className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white">
+                    <option value="">Select assignee…</option>
+                    {users.map((u: any) => (
+                      <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
+                    ))}
+                  </select>
+                  <input type="number" min={1} max={90} value={fuDays} onChange={e => setFuDays(Number(e.target.value))}
+                    placeholder="Days until due"
+                    className="border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+                  <input type="text" value={fuNote} onChange={e => setFuNote(e.target.value)}
+                    placeholder="Task note / title (optional)"
+                    className="border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+                </div>
+                <Button size="sm" onClick={submitFollowUp} disabled={fuSaving || !fuAssignee || fuDays < 1}>
+                  {fuSaving ? 'Creating…' : 'Create Follow-up Task'}
+                </Button>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="activity" className="mt-4 space-y-4">

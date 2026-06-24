@@ -11,6 +11,7 @@ interface Task {
   status: string
   dueDate: string | null
   type: string
+  assignedToId: string
   assignedTo: { name: string; role: string } | null
   deal: { dealNumber: string; customerName: string } | null
   createdAt: string
@@ -61,10 +62,10 @@ export default function WorkloadPage() {
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
 
         const grouped: UserWorkload[] = users.map((u: any) => {
-          const userTasks = tasks.filter((t: Task) => t.assignedTo?.name === u.name)
+          const userTasks = tasks.filter((t: Task) => t.assignedToId === u.id)
           const overdue = userTasks.filter(t => t.status === 'pending' && t.dueDate && new Date(t.dueDate) < today)
           const pending = userTasks.filter(t => t.status === 'pending' && (!t.dueDate || new Date(t.dueDate) >= today))
-          const done = userTasks.filter(t => t.status === 'completed')
+          const done = userTasks.filter(t => t.status === 'done')
           return { id: u.id, name: u.name, role: u.role, overdue, pending, done }
         })
 

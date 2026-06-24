@@ -58,4 +58,5 @@ export const ROLES: Record<string, string> = {
   accounts: 'Accounts & Finance',
   manufacturing: 'Manufacturing Head',
   design: 'Design Head',
+  sales: 'Sales Executive',
 }

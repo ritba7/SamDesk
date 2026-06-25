@@ -8,16 +8,17 @@ export async function GET(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const user = session.user as any
 
-  // Only director and accounts can see all payments
   if (!['director', 'accounts'].includes(user.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
   const { searchParams } = new URL(req.url)
   const all = searchParams.get('all') === 'true'
+  const dealId = searchParams.get('dealId')
 
-  if (all) {
+  if (all || dealId) {
     const payments = await prisma.payment.findMany({
+      where: dealId ? { dealId } : undefined,
       include: {
         deal: { select: { id: true, dealNumber: true, customerName: true, customerCompany: true } }
       },
@@ -35,7 +36,7 @@ export async function POST(req: NextRequest) {
   const user = session.user as any
   const body = await req.json()
 
-  const { paymentMode, utrNumber, bankAccount, ...rest } = body
+  const { paymentMode, utrNumber, bankAccount, scheduledDate, received, ...rest } = body
 
   const payment = await prisma.payment.create({
     data: {
@@ -43,73 +44,92 @@ export async function POST(req: NextRequest) {
       ...(paymentMode ? { paymentMode } : {}),
       ...(utrNumber ? { utrNumber } : {}),
       ...(bankAccount ? { bankAccount } : {}),
+      ...(scheduledDate ? { scheduledDate: new Date(scheduledDate) } : {}),
+      received: received !== false,
     }
   })
 
-  // Log activity
-  await prisma.activity.create({
-    data: {
-      dealId: body.dealId,
-      userId: user.id,
-      type: 'payment',
-      content: `Payment received — ₹${body.amount.toLocaleString('en-IN')} (${body.type})${paymentMode ? ` via ${paymentMode}` : ''}${utrNumber ? ` Ref: ${utrNumber}` : ''}`,
-    }
+  const deal = await prisma.deal.findUnique({
+    where: { id: body.dealId },
+    select: { customerName: true, customerCompany: true, advanceDeadline: true }
   })
 
-  // Auto-update deal advance/balance flags
-  if (body.type === 'advance') {
-    await prisma.deal.update({
-      where: { id: body.dealId },
-      data: { advanceReceived: true, advanceDate: new Date(body.date) }
+  const accountsUser = await prisma.user.findFirst({ where: { role: 'accounts' } })
+
+  // Log activity for received payments
+  if (received !== false) {
+    await prisma.activity.create({
+      data: {
+        dealId: body.dealId,
+        userId: user.id,
+        type: 'payment',
+        content: `Payment received — ₹${Number(body.amount).toLocaleString('en-IN')} (${body.type})${paymentMode ? ` via ${paymentMode}` : ''}${utrNumber ? ` · Ref: ${utrNumber}` : ''}`,
+      }
     })
 
-    // Get deal to check advanceDeadline
-    const deal = await prisma.deal.findUnique({ where: { id: body.dealId }, select: { advanceDeadline: true, customerName: true } })
+    // Update deal flags
+    if (body.type === 'advance') {
+      await prisma.deal.update({
+        where: { id: body.dealId },
+        data: { advanceReceived: true, advanceDate: new Date(body.date) }
+      })
+    } else if (body.type === 'balance') {
+      await prisma.deal.update({
+        where: { id: body.dealId },
+        data: { balancePaid: true, balanceDate: new Date(body.date) }
+      })
+    }
+  }
 
-    // Create advance payment activity if advanceDeadline set
-    if (deal?.advanceDeadline) {
-      await prisma.activity.create({
+  // If scheduledDate set, create reminder tasks for accounts head 1 and 2 days before
+  if (scheduledDate && accountsUser) {
+    const sDate = new Date(scheduledDate)
+
+    const oneDayBefore = new Date(sDate)
+    oneDayBefore.setDate(oneDayBefore.getDate() - 1)
+
+    const twoDaysBefore = new Date(sDate)
+    twoDaysBefore.setDate(twoDaysBefore.getDate() - 2)
+
+    const company = deal?.customerCompany || deal?.customerName || ''
+    const typeLabel = body.type === 'advance' ? 'advance' : body.type === 'balance' ? 'balance' : 'payment'
+
+    if (twoDaysBefore > new Date()) {
+      await prisma.task.create({
         data: {
-          dealId: payment.dealId,
-          userId: user.id,
-          type: 'payment',
-          content: `Advance payment of ₹${payment.amount.toLocaleString('en-IN')} received via ${paymentMode || 'N/A'} (Ref: ${utrNumber || 'N/A'})`,
+          dealId: body.dealId,
+          title: `Reminder: ${typeLabel} of ₹${Number(body.amount).toLocaleString('en-IN')} due in 2 days — ${company}`,
+          dueDate: twoDaysBefore,
+          type: 'follow_up',
+          assignedToId: accountsUser.id,
+          createdById: user.id,
         }
       })
     }
 
-    // Create follow-up task for accounts if no existing one
-    const accountsUser = await prisma.user.findFirst({ where: { role: 'accounts' } })
-    if (accountsUser) {
-      const existingTask = await prisma.task.findFirst({
-        where: {
+    if (oneDayBefore > new Date()) {
+      await prisma.task.create({
+        data: {
           dealId: body.dealId,
+          title: `Final reminder: ${typeLabel} of ₹${Number(body.amount).toLocaleString('en-IN')} due tomorrow — ${company}`,
+          dueDate: oneDayBefore,
+          type: 'follow_up',
           assignedToId: accountsUser.id,
-          title: { contains: 'Follow up on advance payment' },
-          status: 'pending',
+          createdById: user.id,
         }
       })
-      if (!existingTask) {
-        const deal2 = await prisma.deal.findUnique({ where: { id: body.dealId }, select: { advanceDeadline: true, customerName: true } })
-        const dueDate = deal2?.advanceDeadline
-          ? new Date(deal2.advanceDeadline)
-          : (() => { const d = new Date(); d.setDate(d.getDate() + 3); return d })()
-        await prisma.task.create({
-          data: {
-            dealId: body.dealId,
-            title: `Follow up on advance payment — ${deal2?.customerName || ''}`,
-            dueDate,
-            type: 'follow_up',
-            assignedToId: accountsUser.id,
-            createdById: user.id,
-          }
-        })
-      }
     }
-  } else if (body.type === 'balance') {
-    await prisma.deal.update({
-      where: { id: body.dealId },
-      data: { balancePaid: true, balanceDate: new Date(body.date) }
+
+    // Task on due date itself
+    await prisma.task.create({
+      data: {
+        dealId: body.dealId,
+        title: `Collect ${typeLabel} payment of ₹${Number(body.amount).toLocaleString('en-IN')} — ${company}`,
+        dueDate: sDate,
+        type: 'follow_up',
+        assignedToId: accountsUser.id,
+        createdById: user.id,
+      }
     })
   }
 

@@ -221,17 +221,32 @@ model Document {
 }
 
 model Payment {
-  id        String   @id @default(cuid())
-  dealId    String
-  type      String   // advance, balance, other
-  amount    Float
-  date      DateTime
-  notes     String?
-  paymentMode  String?  // NEFT, RTGS, cheque, cash, UPI, other
-  utrNumber    String?  // UTR / reference number
-  bankAccount  String?  // which bank account received
-  deal      Deal     @relation(fields: [dealId], references: [id])
-  createdAt DateTime @default(now())
+  id           String    @id @default(cuid())
+  dealId       String
+  type         String    // advance, balance, milestone, other
+  amount       Float
+  date         DateTime
+  scheduledDate DateTime? // when payment is expected (for reminders)
+  notes        String?
+  paymentMode  String?   // NEFT, RTGS, cheque, cash, UPI, other
+  utrNumber    String?   // UTR / reference number
+  bankAccount  String?   // which bank account received
+  received     Boolean   @default(true) // false = scheduled/expected
+  deal         Deal      @relation(fields: [dealId], references: [id])
+  createdAt    DateTime  @default(now())
+}
+
+model Expense {
+  id          String   @id @default(cuid())
+  dealId      String?
+  category    String   // freight, installation, raw_material, vendor, salary, other
+  amount      Float
+  date        DateTime
+  vendorName  String?
+  utrNumber   String?
+  paymentMode String?
+  notes       String?
+  createdAt   DateTime @default(now())
 }
 
 model Inventory {
@@ -248,12 +263,3 @@ model Inventory {
   createdAt   DateTime @default(now())
 }
 
-model Expense {
-  id        String   @id @default(cuid())
-  dealId    String?
-  category  String   // freight, installation, raw_material, other
-  amount    Float
-  date      DateTime
-  notes     String?
-  createdAt DateTime @default(now())
-}

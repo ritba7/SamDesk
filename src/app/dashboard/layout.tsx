@@ -6,7 +6,7 @@ import Link from 'next/link'
 import {
   Wind, LayoutDashboard, FileText, CheckSquare, Factory,
   Package, BarChart3, LogOut, ChevronLeft, ChevronRight, Menu, User, Bell, CreditCard,
-  Users, AlertCircle, Clock
+  Users, AlertCircle, Clock, CalendarDays
 } from 'lucide-react'
 import { cn, ROLES } from '@/lib/utils'
 
@@ -19,6 +19,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { href: '/dashboard',            label: 'Dashboard',   icon: LayoutDashboard, roles: ['director', 'vp', 'accounts', 'manufacturing', 'design', 'sales'] },
+  { href: '/dashboard/calendar',   label: 'Calendar',    icon: CalendarDays,    roles: ['director', 'vp', 'accounts', 'sales', 'manufacturing', 'design'] },
   { href: '/dashboard/deals',      label: 'Pipeline',    icon: FileText,        roles: ['director', 'vp', 'accounts', 'design', 'sales'] },
   { href: '/dashboard/tasks',      label: 'Tasks',       icon: CheckSquare,     roles: ['director', 'vp', 'accounts', 'manufacturing', 'design', 'sales'] },
   { href: '/dashboard/production', label: 'Production',  icon: Factory,         roles: ['director', 'vp', 'manufacturing'] },

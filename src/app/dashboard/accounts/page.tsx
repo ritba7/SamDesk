@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { Download, ChevronDown, ChevronUp, Plus, X, ArrowDownCircle, ArrowUpCircle, Calendar, CheckCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatCurrency, formatDate, getStageLabel } from '@/lib/utils'
 import Link from 'next/link'
 
 const inputCls = 'w-full h-9 px-3 rounded-md border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white'
@@ -327,11 +327,25 @@ export default function AccountsPage() {
   const thisMonthExpenses = expenses.filter(e => isThisMonth(e.date))
   const spentThisMonth = thisMonthExpenses.reduce((s, e) => s + e.amount, 0)
 
+  // Received total per deal (only actually-received payments)
+  const receivedForDeal = (d: any) =>
+    (d.payments || []).filter((p: any) => p.received !== false).reduce((s: number, p: any) => s + p.amount, 0)
+
+  // Outstanding balance for a deal = quoted − received (floor 0)
+  const outstandingForDeal = (d: any) => {
+    if (!d.quotedAmount) return d.balanceAmount || 0
+    return Math.max(0, d.quotedAmount - receivedForDeal(d))
+  }
+
   // Sections
+  const CONFIRMED_STAGES = ['po_received', 'po_vetted', 'pi_sent', 'approval_pending', 'production', 'dispatch_ready', 'dispatched', 'installation', 'completed']
   const advancePending = deals.filter(d =>
     ['pi_sent', 'approval_pending', 'production', 'dispatch_ready', 'dispatched'].includes(d.stage) && !d.advanceReceived
   )
-  const balancePending = deals.filter(d => ['dispatched', 'installation', 'completed'].includes(d.stage) && !d.balancePaid)
+  // Balance pending = confirmed order, not marked balance-paid, and still money outstanding
+  const balancePending = deals.filter(d =>
+    CONFIRMED_STAGES.includes(d.stage) && !d.balancePaid && outstandingForDeal(d) > 0
+  )
 
   const displayedPayments = showAllPayments ? allPayments.filter(p => p.received !== false) : thisMonthPayments
 
@@ -344,9 +358,10 @@ export default function AccountsPage() {
     if (!d.advanceReceived && d.advanceDeadline && ['pi_sent', 'approval_pending', 'production', 'dispatch_ready', 'dispatched'].includes(d.stage)) {
       dueItems.push({ id: `adv-${d.id}`, date: new Date(d.advanceDeadline), dir: 'in', amount: d.advanceAmount || (d.quotedAmount ? d.quotedAmount * 0.5 : 0), label: d.customerCompany, sub: `Advance · ${d.dealNumber}`, dealId: d.id, deal: d })
     }
-    // Receivable: balance pending with deadline
-    if (!d.balancePaid && d.balanceDeadline && ['dispatched', 'installation', 'completed'].includes(d.stage)) {
-      dueItems.push({ id: `bal-${d.id}`, date: new Date(d.balanceDeadline), dir: 'in', amount: d.balanceAmount || 0, label: d.customerCompany, sub: `Balance · ${d.dealNumber}`, dealId: d.id, deal: d })
+    // Receivable: balance pending — date from balanceDeadline, else expectedDispatch
+    const balDate = d.balanceDeadline || d.expectedDispatch
+    if (!d.balancePaid && balDate && CONFIRMED_STAGES.includes(d.stage) && outstandingForDeal(d) > 0) {
+      dueItems.push({ id: `bal-${d.id}`, date: new Date(balDate), dir: 'in', amount: outstandingForDeal(d), label: d.customerCompany, sub: `Balance · ${d.dealNumber}`, dealId: d.id, deal: d })
     }
   })
   // Receivable: scheduled incoming payments
@@ -582,10 +597,14 @@ export default function AccountsPage() {
                 <div key={deal.id} className="flex items-center justify-between p-3 rounded-lg border border-gray-200 bg-white">
                   <div>
                     <Link href={`/dashboard/deals/${deal.id}`} className="text-sm font-medium text-gray-900 hover:text-blue-600">{deal.customerCompany}</Link>
-                    <p className="text-xs text-gray-500">{deal.dealNumber} · Dispatched {daysSince(deal.updatedAt)}d ago</p>
+                    <p className="text-xs text-gray-500">
+                      {deal.dealNumber} · {getStageLabel(deal.stage)}
+                      {deal.quotedAmount ? ` · Quoted ${formatCurrency(deal.quotedAmount)}, recd ${formatCurrency(receivedForDeal(deal))}` : ''}
+                    </p>
+                    {deal.balanceDeadline && <p className="text-xs text-amber-600 mt-0.5">Due: {formatDate(deal.balanceDeadline)}</p>}
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-red-700">{deal.balanceAmount ? formatCurrency(deal.balanceAmount) : '—'}</span>
+                    <span className="text-sm font-medium text-red-700">{formatCurrency(outstandingForDeal(deal))}</span>
                     <Button size="sm" variant="outline" onClick={() => setPaymentModal({ ...deal, _defaultType: 'balance' })}>
                       <Plus className="w-3.5 h-3.5 mr-1" /> Log
                     </Button>

@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
         body: JSON.stringify({
           model: 'claude-haiku-4-5',
           max_tokens: 300,
-          system: "You are a sales assistant for SAM PRODUCTS Pvt. Ltd., manufacturers of Air Showers and Cleanroom solutions. Write a SHORT professional introduction email (3-4 sentences, no more than 100 words). It should: introduce SAM PRODUCTS briefly, acknowledge the customer's requirement, mention that TDS/specs document is being shared, and invite them to discuss further. Sign off as 'Team SAM PRODUCTS'. Do not include subject line, filler phrases, or long paragraphs.",
+          system: "You are a sales assistant for SAM PRODUCTS Pvt. Ltd., manufacturers of Air Showers and Cleanroom solutions since 1992. Write a SHORT professional introduction email (3-4 sentences, no more than 100 words). It should: introduce SAM PRODUCTS briefly, acknowledge the customer's requirement, mention that our brochure, client list and company profile are attached for their reference, and invite them to discuss further. Sign off as 'Team SAM PRODUCTS'. Do not include subject line, filler phrases, or long paragraphs.",
           messages: [
             {
               role: 'user',
@@ -57,10 +57,12 @@ ${timeline === 'urgent' ? 'Note: Requirement is urgent.' : ''}`
   const urgentNote = timeline === 'urgent' ? '\n\nWe note that your requirement is urgent and assure you of priority attention.' : ''
   const email = `Dear ${customerName || "Sir/Ma'am"},
 
-Thank you for your enquiry regarding ${product}s. SAM PRODUCTS Pvt. Ltd. has been manufacturing premium Air Showers and Cleanroom solutions since 1992, serving clients across pharma, electronics, and defence sectors. Please find our TDS and product specifications attached for your review.${urgentNote} We would be glad to schedule a call and discuss your specific requirements.
+Thank you for your enquiry regarding ${product}s. SAM PRODUCTS Pvt. Ltd. has been manufacturing premium Air Showers and Cleanroom solutions since 1992, serving clients across pharma, electronics, and defence sectors. Please find our product brochure, client list and company profile attached for your reference.${urgentNote} We would be glad to schedule a call and discuss your specific requirements.
 
 Team SAM PRODUCTS
-SAM PRODUCTS Pvt. Ltd. | +91-9810065139 | samproducts1992@gmail.com`
+SAM PRODUCTS Pvt. Ltd. | +91-9810065139 | samproducts1992@gmail.com
+
+Attachments: Air Shower Brochure, Client List, Company Profile`
 
   return NextResponse.json({ email })
 }

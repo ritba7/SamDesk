@@ -5,6 +5,8 @@ import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { ArrowLeft, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import ModelSelector from '@/components/ModelSelector'
+import { APPLICATIONS, ENTRY_TYPES, AIR_FLOW_TIMES, DOOR_TYPES } from '@/lib/airShowerModels'
 
 const STATES = ['Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh','Goa','Gujarat','Haryana','Himachal Pradesh','Jharkhand','Karnataka','Kerala','Madhya Pradesh','Maharashtra','Manipur','Meghalaya','Mizoram','Nagaland','Odisha','Punjab','Rajasthan','Sikkim','Tamil Nadu','Telangana','Tripura','Uttar Pradesh','Uttarakhand','West Bengal','Delhi','Jammu & Kashmir','Ladakh','Puducherry','Chandigarh']
 
@@ -178,6 +180,16 @@ function Tab2Form({ deal, save, saving, inputCls, labelCls }: any) {
     freightTerms: deal.freightTerms || '',
     inspectionTerms: deal.inspectionTerms || '',
     freightPaidBy: deal.freightPaidBy || '',
+    modelNumber: deal.modelNumber || '',
+    airShowerConfig: deal.airShowerConfig || 'straight',
+    sizeCode: '', requiredDepth: '', requiredWidth: '',
+    application: deal.application || '',
+    numberOfUsers: deal.numberOfUsers ? String(deal.numberOfUsers) : '',
+    entryType: deal.entryType || '',
+    airFlowTime: deal.airFlowTime || '',
+    doorType: deal.doorType || '',
+    flooringRequired: deal.flooringRequired ? 'true' : 'false',
+    inputPower: deal.inputPower || '440V / 50Hz',
   })
   const ch = (e: any) => setForm(f => ({ ...f, [e.target.name]: e.target.value }))
   const handleSave = () => {
@@ -189,6 +201,9 @@ function Tab2Form({ deal, save, saving, inputCls, labelCls }: any) {
     ;['outerWidth','outerHeight','outerDepth','innerWidth','innerHeight','innerDepth'].forEach(k => {
       if (data[k]) data[k] = parseFloat(data[k]); else delete data[k]
     })
+    delete data.sizeCode; delete data.requiredDepth; delete data.requiredWidth
+    if (data.numberOfUsers) data.numberOfUsers = parseInt(data.numberOfUsers); else delete data.numberOfUsers
+    data.flooringRequired = data.flooringRequired === 'true'
     save(data)
   }
   return (
@@ -218,17 +233,38 @@ function Tab2Form({ deal, save, saving, inputCls, labelCls }: any) {
         <div><label className={labelCls}>Budget Indication (INR)</label><input name="budgetIndication" type="number" value={form.budgetIndication} onChange={ch} className={inputCls} /></div>
         <div className="md:col-span-2"><label className={labelCls}>Query Summary</label><textarea name="querySummary" value={form.querySummary} onChange={ch} className="w-full px-3 py-2 rounded-md border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" rows={3} /></div>
         <div className="md:col-span-2"><label className={labelCls}>Spec Notes</label><textarea name="specNotes" value={form.specNotes} onChange={ch} className="w-full px-3 py-2 rounded-md border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" rows={3} /></div>
-        <div>
-          <label className={labelCls}>Material</label>
-          <select name="material" value={form.material} onChange={ch} className={inputCls}>
-            <option value="">Select material</option>
-            <option value="ms">MS</option>
-            <option value="ss304">SS304</option>
-            <option value="ss202">SS202</option>
-            <option value="ms+ss202">MS + SS202</option>
-            <option value="ms+ss304">MS + SS304</option>
-          </select>
+
+        <div><label className={labelCls}>Application</label>
+          <select name="application" value={form.application} onChange={ch} className={inputCls}>
+            <option value="">Select</option>{APPLICATIONS.map(a => <option key={a} value={a}>{a}</option>)}
+          </select></div>
+        <div><label className={labelCls}>Entry Type</label>
+          <select name="entryType" value={form.entryType} onChange={ch} className={inputCls}>
+            <option value="">Select</option>{ENTRY_TYPES.map(e => <option key={e.key} value={e.key}>{e.label}</option>)}
+          </select></div>
+        <div><label className={labelCls}>Users / Cycle</label><input name="numberOfUsers" type="number" value={form.numberOfUsers} onChange={ch} className={inputCls} /></div>
+        <div><label className={labelCls}>Air Flow Time</label>
+          <select name="airFlowTime" value={form.airFlowTime} onChange={ch} className={inputCls}>
+            <option value="">Select</option>{AIR_FLOW_TIMES.map(t => <option key={t} value={t}>{t} sec</option>)}<option value="other">Other</option>
+          </select></div>
+        <div><label className={labelCls}>Door Type</label>
+          <select name="doorType" value={form.doorType} onChange={ch} className={inputCls}>
+            <option value="">Select</option>{DOOR_TYPES.map(d => <option key={d.key} value={d.key}>{d.label}</option>)}
+          </select></div>
+        <div><label className={labelCls}>Flooring</label>
+          <select name="flooringRequired" value={form.flooringRequired} onChange={ch} className={inputCls}>
+            <option value="false">Not Required</option><option value="true">Required</option>
+          </select></div>
+
+        <div className="md:col-span-2">
+          <ModelSelector
+            material={form.material} config={form.airShowerConfig}
+            requiredDepth={form.requiredDepth} requiredWidth={form.requiredWidth} sizeCode={form.sizeCode}
+            onChange={patch => setForm(f => ({ ...f, ...patch }))}
+          />
+          {form.modelNumber && <div className="mt-2 text-sm"><span className="text-gray-500">Selected Model: </span><span className="font-mono font-bold text-blue-700">{form.modelNumber}</span></div>}
         </div>
+
         <div>
           <label className={labelCls}>Motor Type</label>
           <select name="motorType" value={form.motorType} onChange={ch} className={inputCls}>

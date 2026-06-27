@@ -57,6 +57,8 @@ export async function POST(req: NextRequest) {
     outerDepth, outerHeight, outerWidth, innerDepth, innerHeight, innerWidth,
     freightPaidBy, installationType, expectedDispatch,
     paymentTerms, freightTerms, inspectionTerms, introEmail, tdsDeadline,
+    modelNumber, airShowerConfig, application, numberOfUsers, entryType,
+    airFlowTime, doorType, flooringRequired, inputPower,
   } = body
 
   const deal = await prisma.deal.create({
@@ -99,6 +101,15 @@ export async function POST(req: NextRequest) {
       ...(inspectionTerms ? { inspectionTerms } : {}),
       ...(introEmail ? { introEmail } : {}),
       ...(tdsDeadline ? { tdsDeadline: new Date(tdsDeadline) } : {}),
+      ...(modelNumber ? { modelNumber } : {}),
+      ...(airShowerConfig ? { airShowerConfig } : {}),
+      ...(application ? { application } : {}),
+      ...(numberOfUsers ? { numberOfUsers: Number(numberOfUsers) } : {}),
+      ...(entryType ? { entryType } : {}),
+      ...(airFlowTime ? { airFlowTime } : {}),
+      ...(doorType ? { doorType } : {}),
+      ...(flooringRequired !== undefined ? { flooringRequired: !!flooringRequired } : {}),
+      ...(inputPower ? { inputPower } : {}),
       dealNumber,
       createdById: user.id,
       stage: 'inquiry',

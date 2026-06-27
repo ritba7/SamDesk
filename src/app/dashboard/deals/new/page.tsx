@@ -3,6 +3,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Loader2, CheckCircle, AlertCircle, Copy, Check } from 'lucide-react'
 import Link from 'next/link'
+import ModelSelector from '@/components/ModelSelector'
+import { APPLICATIONS, ENTRY_TYPES, AIR_FLOW_TIMES, DOOR_TYPES, MOTOR_TYPES } from '@/lib/airShowerModels'
 
 const STATES = ['Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh','Goa','Gujarat','Haryana','Himachal Pradesh','Jharkhand','Karnataka','Kerala','Madhya Pradesh','Maharashtra','Manipur','Meghalaya','Mizoram','Nagaland','Odisha','Punjab','Rajasthan','Sikkim','Tamil Nadu','Telangana','Tripura','Uttar Pradesh','Uttarakhand','West Bengal','Delhi','Jammu & Kashmir','Ladakh','Puducherry','Chandigarh']
 
@@ -45,12 +47,15 @@ export default function NewDealPage() {
     productInterest: '', querySummary: '', estimatedQty: '', timeline: '',
     budgetIndication: '', specNotes: '',
     assignedToId: '', priority: 'medium', expectedDispatch: '',
-    material: '', motorType: '', motorBrand: '', motorBrandOther: '',
+    material: 'ms', motorType: '', motorBrand: '', motorBrandOther: '',
     outerWidth: '', outerHeight: '', outerDepth: '',
     innerWidth: '', innerHeight: '', innerDepth: '',
     freightPaidBy: '', installationType: '', heatScore: 'warm',
     quotedAmount: '', gstRate: '18',
     paymentTerms: '', freightTerms: '', inspectionTerms: '', introEmail: '', tdsDeadline: '',
+    modelNumber: '', airShowerConfig: 'straight', sizeCode: '', requiredDepth: '', requiredWidth: '',
+    application: '', numberOfUsers: '', entryType: '', airFlowTime: '', doorType: '',
+    flooringRequired: '', inputPower: '440V / 50Hz',
   })
 
   useEffect(() => {
@@ -167,8 +172,16 @@ export default function NewDealPage() {
         verificationData: JSON.stringify(manualChecks),
         introEmail: form.introEmail || generatedEmail || undefined,
       }
-      // Strip fields not in schema
+      // Strip helper fields not in schema
       delete body.website
+      delete body.sizeCode
+      delete body.requiredDepth
+      delete body.requiredWidth
+      // flooringRequired comes in as '' | 'true' | 'false'
+      if (body.flooringRequired === 'true') body.flooringRequired = true
+      else if (body.flooringRequired === 'false') body.flooringRequired = false
+      else delete body.flooringRequired
+      if (body.numberOfUsers) body.numberOfUsers = parseInt(body.numberOfUsers); else delete body.numberOfUsers
       if (body.outerWidth) body.outerWidth = parseFloat(body.outerWidth)
       if (body.outerHeight) body.outerHeight = parseFloat(body.outerHeight)
       if (body.outerDepth) body.outerDepth = parseFloat(body.outerDepth)
@@ -417,27 +430,84 @@ export default function NewDealPage() {
             </div>
           </div>
 
-          {/* Product Specifications */}
+          {/* Air Shower Selection (from brochure) */}
           <div className="border-t border-gray-100 pt-5">
-            <h3 className="text-sm font-semibold text-gray-800 mb-3">Product Specifications</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <h3 className="text-sm font-semibold text-gray-800 mb-3">Air Shower Selection</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
-                <label className={labelCls}>Material</label>
-                <select name="material" value={form.material} onChange={handleChange} className={inputCls}>
-                  <option value="">Select material</option>
-                  <option value="ms">MS</option>
-                  <option value="ss304">SS304</option>
-                  <option value="ss202">SS202</option>
-                  <option value="ms+ss202">MS + SS202</option>
-                  <option value="ms+ss304">MS + SS304</option>
+                <label className={labelCls}>Application</label>
+                <select name="application" value={form.application} onChange={handleChange} className={inputCls}>
+                  <option value="">Select application</option>
+                  {APPLICATIONS.map(a => <option key={a} value={a}>{a}</option>)}
                 </select>
               </div>
+              <div>
+                <label className={labelCls}>Entry Type</label>
+                <select name="entryType" value={form.entryType} onChange={handleChange} className={inputCls}>
+                  <option value="">Select entry type</option>
+                  {ENTRY_TYPES.map(e => <option key={e.key} value={e.key}>{e.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>Number of Users / Cycle</label>
+                <input name="numberOfUsers" type="number" value={form.numberOfUsers} onChange={handleChange} className={inputCls} placeholder="e.g. 2" />
+              </div>
+              <div>
+                <label className={labelCls}>Air Flow Time (seconds)</label>
+                <select name="airFlowTime" value={form.airFlowTime} onChange={handleChange} className={inputCls}>
+                  <option value="">Select</option>
+                  {AIR_FLOW_TIMES.map(t => <option key={t} value={t}>{t} sec</option>)}
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>Door Type</label>
+                <select name="doorType" value={form.doorType} onChange={handleChange} className={inputCls}>
+                  <option value="">Select door type</option>
+                  {DOOR_TYPES.map(d => <option key={d.key} value={d.key}>{d.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>Flooring</label>
+                <select name="flooringRequired" value={form.flooringRequired} onChange={handleChange} className={inputCls}>
+                  <option value="">Select</option>
+                  <option value="true">Required</option>
+                  <option value="false">Not Required</option>
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>Input Power</label>
+                <input name="inputPower" value={form.inputPower} onChange={handleChange} className={inputCls} placeholder="440V / 50Hz" />
+              </div>
+            </div>
+
+            {/* Model selector with auto-suggest */}
+            <ModelSelector
+              material={form.material}
+              config={form.airShowerConfig}
+              requiredDepth={form.requiredDepth}
+              requiredWidth={form.requiredWidth}
+              sizeCode={form.sizeCode}
+              onChange={patch => setForm(f => ({ ...f, ...patch }))}
+            />
+
+            {form.modelNumber && (
+              <div className="mt-3 flex items-center gap-2 text-sm">
+                <span className="text-gray-500">Selected Model:</span>
+                <span className="font-mono font-bold text-blue-700">{form.modelNumber}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Product Specifications */}
+          <div className="border-t border-gray-100 pt-5">
+            <h3 className="text-sm font-semibold text-gray-800 mb-3">Motor & Dimensions</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className={labelCls}>Motor Type</label>
                 <select name="motorType" value={form.motorType} onChange={handleChange} className={inputCls}>
                   <option value="">Select motor type</option>
-                  <option value="ie2">IE2</option>
-                  <option value="ie3">IE3</option>
+                  {MOTOR_TYPES.map(m => <option key={m.key} value={m.key}>{m.label}</option>)}
                 </select>
               </div>
               <div>
@@ -547,6 +617,24 @@ export default function NewDealPage() {
                 </button>
               </div>
             )}
+
+            {/* Attachments to send with the intro email */}
+            <div className="mt-3 border-t border-gray-100 pt-3">
+              <p className="text-xs font-medium text-gray-600 mb-2">Attachments (sent with intro email)</p>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { label: 'Air Shower Brochure', path: '/docs/SAM-Air-Shower-Brochure.pdf' },
+                  { label: 'Client List', path: '/docs/SAM-Products-Client-List.pdf' },
+                  { label: 'Company Profile', path: '/docs/SAM-Products-Company-Deck.pdf' },
+                ].map(d => (
+                  <a key={d.path} href={d.path} download target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-xs hover:bg-blue-100 transition-colors">
+                    <CheckCircle className="w-3.5 h-3.5" /> {d.label}
+                  </a>
+                ))}
+              </div>
+              <p className="text-xs text-gray-400 mt-1.5">Download these and attach them to your email to the customer.</p>
+            </div>
           </div>
 
           <div className="flex justify-between pt-2">

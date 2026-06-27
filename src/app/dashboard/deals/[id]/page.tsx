@@ -350,8 +350,14 @@ export default function DealDetailPage() {
             </Card>
             <Card><CardHeader><CardTitle className="text-sm">Product Specs</CardTitle></CardHeader>
               <CardContent className="space-y-2 text-sm">
-                {hasSpecs ? (
+                {hasSpecs || deal.modelNumber ? (
                   <>
+                    {deal.modelNumber && <div className="flex justify-between"><span className="text-gray-500">Model</span><span className="font-mono font-semibold text-blue-700">{deal.modelNumber}</span></div>}
+                    {deal.application && <div className="flex justify-between"><span className="text-gray-500">Application</span><span>{deal.application}</span></div>}
+                    {deal.numberOfUsers && <div className="flex justify-between"><span className="text-gray-500">Users / Cycle</span><span>{deal.numberOfUsers}</span></div>}
+                    {deal.entryType && <div className="flex justify-between"><span className="text-gray-500">Entry Type</span><span className="capitalize">{deal.entryType.replace(/_/g, ' ')}</span></div>}
+                    {deal.airFlowTime && <div className="flex justify-between"><span className="text-gray-500">Air Flow Time</span><span>{deal.airFlowTime} sec</span></div>}
+                    {deal.doorType && <div className="flex justify-between"><span className="text-gray-500">Door Type</span><span className="capitalize">{deal.doorType.replace(/_/g, ' ')}</span></div>}
                     {deal.material && <div className="flex justify-between"><span className="text-gray-500">Material</span><span className="uppercase">{deal.material}</span></div>}
                     {deal.motorType && <div className="flex justify-between"><span className="text-gray-500">Motor</span><span className="uppercase">{deal.motorType}{deal.motorBrand ? ` — ${deal.motorBrand === 'other' ? deal.motorBrandOther : deal.motorBrand}` : ''}</span></div>}
                     {deal.outerWidth && <div className="flex justify-between"><span className="text-gray-500">Outer (W×H×D)</span><span>{deal.outerWidth}×{deal.outerHeight}×{deal.outerDepth} mm</span></div>}
@@ -393,6 +399,21 @@ export default function DealDetailPage() {
               </CardHeader>
               <CardContent>
                 <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans bg-gray-50 rounded-lg p-3 overflow-auto max-h-48">{deal.introEmail}</pre>
+                <div className="mt-3">
+                  <p className="text-xs font-medium text-gray-600 mb-1.5">Attachments to send</p>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { label: 'Brochure', path: '/docs/SAM-Air-Shower-Brochure.pdf' },
+                      { label: 'Client List', path: '/docs/SAM-Products-Client-List.pdf' },
+                      { label: 'Company Profile', path: '/docs/SAM-Products-Company-Deck.pdf' },
+                    ].map(d => (
+                      <a key={d.path} href={d.path} download target="_blank" rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 text-blue-700 rounded-lg text-xs hover:bg-blue-100">
+                        <Download className="w-3 h-3" /> {d.label}
+                      </a>
+                    ))}
+                  </div>
+                </div>
               </CardContent>
             </Card>
           )}

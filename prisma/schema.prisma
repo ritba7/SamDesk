@@ -76,6 +76,17 @@ model Deal {
   innerWidth      Float?
   specNotes       String?
 
+  // Air shower model selection (from brochure)
+  modelNumber     String?  // e.g. S3138, SS110RE
+  airShowerConfig String?  // straight, RE, LE, SR, SL, RL
+  application     String?  // pharma, automobile, electronics, food, etc.
+  numberOfUsers   Int?     // users per cycle
+  entryType       String?  // human, human_trolley, material
+  airFlowTime     String?  // seconds: 10/15/20/30/40/60
+  doorType        String?  // hinged, sliding, rollup, shutter, pvc, air_curtain
+  flooringRequired Boolean @default(false)
+  inputPower      String?  @default("440V / 50Hz")
+
   // Logistics
   freightPaidBy   String?  // customer, company
   installationType String? // none, online, onsite

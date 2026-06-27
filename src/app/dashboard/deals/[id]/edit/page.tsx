@@ -301,6 +301,7 @@ function Tab3Form({ deal, users, save, saving, inputCls, labelCls, fmtDate }: an
     expectedDispatch: fmtDate(deal.expectedDispatch),
     tdsDeadline: fmtDate(deal.tdsDeadline),
     advanceDeadline: fmtDate(deal.advanceDeadline),
+    balanceDeadline: fmtDate(deal.balanceDeadline),
     advanceNote: deal.advanceNote || '',
   })
   const ch = (e: any) => setForm(f => ({ ...f, [e.target.name]: e.target.value }))
@@ -310,6 +311,7 @@ function Tab3Form({ deal, users, save, saving, inputCls, labelCls, fmtDate }: an
     if (data.expectedDispatch) data.expectedDispatch = new Date(data.expectedDispatch).toISOString(); else delete data.expectedDispatch
     if (data.tdsDeadline) data.tdsDeadline = new Date(data.tdsDeadline).toISOString(); else delete data.tdsDeadline
     if (data.advanceDeadline) data.advanceDeadline = new Date(data.advanceDeadline).toISOString(); else delete data.advanceDeadline
+    if (data.balanceDeadline) data.balanceDeadline = new Date(data.balanceDeadline).toISOString(); else delete data.balanceDeadline
     save(data)
   }
   return (
@@ -342,6 +344,7 @@ function Tab3Form({ deal, users, save, saving, inputCls, labelCls, fmtDate }: an
         <div><label className={labelCls}>Expected Dispatch</label><input name="expectedDispatch" type="date" value={form.expectedDispatch} onChange={ch} className={inputCls} /></div>
         <div><label className={labelCls}>TDS Deadline</label><input name="tdsDeadline" type="date" value={form.tdsDeadline} onChange={ch} className={inputCls} /></div>
         <div><label className={labelCls}>Advance Deadline</label><input name="advanceDeadline" type="date" value={form.advanceDeadline} onChange={ch} className={inputCls} /></div>
+        <div><label className={labelCls}>Balance Deadline</label><input name="balanceDeadline" type="date" value={form.balanceDeadline} onChange={ch} className={inputCls} /></div>
         <div className="md:col-span-2"><label className={labelCls}>Advance Note</label><textarea name="advanceNote" value={form.advanceNote} onChange={ch} className="w-full px-3 py-2 rounded-md border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" rows={2} placeholder="Notes about advance terms..." /></div>
       </div>
       <div className="flex justify-end pt-2">

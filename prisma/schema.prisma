@@ -100,6 +100,7 @@ model Deal {
   balanceAmount   Float?
   balancePaid     Boolean  @default(false)
   balanceDate     DateTime?
+  balanceDeadline DateTime? // deadline to receive balance payment
   gstRate         Float?   @default(18)
 
   // Inquiry & verification
@@ -242,6 +243,8 @@ model Expense {
   category    String   // freight, installation, raw_material, vendor, salary, other
   amount      Float
   date        DateTime
+  dueDate     DateTime? // when payment is scheduled to go out
+  paid        Boolean  @default(true) // false = scheduled/upcoming payable
   vendorName  String?
   utrNumber   String?
   paymentMode String?

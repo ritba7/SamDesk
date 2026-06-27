@@ -152,11 +152,12 @@ function ExpenseModal({ onClose, onSave, deals }: { onClose: () => void, onSave:
   const [form, setForm] = useState({
     category: 'freight', amount: '', date: new Date().toISOString().slice(0, 10),
     vendorName: '', paymentMode: '', utrNumber: '', dealId: '', notes: '',
+    paid: 'true', dueDate: '',
   })
   const [saving, setSaving] = useState(false)
 
   const handleSubmit = async () => {
-    if (!form.amount || !form.date) return
+    if (!form.amount) return
     setSaving(true)
     await fetch('/api/expenses', {
       method: 'POST',
@@ -165,6 +166,9 @@ function ExpenseModal({ onClose, onSave, deals }: { onClose: () => void, onSave:
         ...form,
         amount: parseFloat(form.amount),
         dealId: form.dealId || undefined,
+        paid: form.paid === 'true',
+        date: form.paid === 'true' ? form.date : (form.dueDate || form.date),
+        dueDate: form.dueDate || undefined,
       })
     })
     setSaving(false)
@@ -182,6 +186,13 @@ function ExpenseModal({ onClose, onSave, deals }: { onClose: () => void, onSave:
         <div className="p-5 space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
+              <label className={labelCls}>Status</label>
+              <select value={form.paid} onChange={e => setForm(f => ({ ...f, paid: e.target.value }))} className={inputCls}>
+                <option value="true">Already Paid</option>
+                <option value="false">Scheduled / To Pay</option>
+              </select>
+            </div>
+            <div>
               <label className={labelCls}>Category</label>
               <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className={inputCls}>
                 <option value="freight">Freight</option>
@@ -192,20 +203,23 @@ function ExpenseModal({ onClose, onSave, deals }: { onClose: () => void, onSave:
                 <option value="other">Other</option>
               </select>
             </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={labelCls}>Amount (₹)</label>
               <input type="number" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} className={inputCls} placeholder="0" />
             </div>
+            <div>
+              <label className={labelCls}>{form.paid === 'true' ? 'Date Paid' : 'Due Date'}</label>
+              <input type="date" value={form.paid === 'true' ? form.date : form.dueDate} onChange={e => setForm(f => form.paid === 'true' ? ({ ...f, date: e.target.value }) : ({ ...f, dueDate: e.target.value }))} className={inputCls} />
+            </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>Date</label>
-              <input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} className={inputCls} />
-            </div>
-            <div>
-              <label className={labelCls}>Vendor / Paid To</label>
-              <input type="text" value={form.vendorName} onChange={e => setForm(f => ({ ...f, vendorName: e.target.value }))} className={inputCls} placeholder="Vendor name" />
-            </div>
+          {form.paid === 'false' && (
+            <p className="text-xs text-blue-600 bg-blue-50 rounded p-2">Reminders auto-sent to accounts head 1 and 2 days before the due date.</p>
+          )}
+          <div>
+            <label className={labelCls}>Vendor / Paid To</label>
+            <input type="text" value={form.vendorName} onChange={e => setForm(f => ({ ...f, vendorName: e.target.value }))} className={inputCls} placeholder="Vendor name" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -281,6 +295,15 @@ export default function AccountsPage() {
     window.open(`/api/export/tally?month=${now.getMonth() + 1}&year=${now.getFullYear()}`, '_blank')
   }
 
+  const markExpensePaid = async (id: string) => {
+    await fetch('/api/expenses', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, paid: true, date: new Date().toISOString() })
+    })
+    loadData()
+  }
+
   if (!allowed) return <div className="text-center py-12 text-gray-400">You do not have access to this page.</div>
   if (loading) return <div className="text-center py-12 text-gray-400">Loading...</div>
 
@@ -310,11 +333,51 @@ export default function AccountsPage() {
   )
   const balancePending = deals.filter(d => ['dispatched', 'installation', 'completed'].includes(d.stage) && !d.balancePaid)
 
-  // Upcoming scheduled payments (received=false with scheduledDate in future)
-  const scheduledPayments = allPayments.filter(p => p.received === false && p.scheduledDate && new Date(p.scheduledDate) >= today)
-    .sort((a, b) => new Date(a.scheduledDate).getTime() - new Date(b.scheduledDate).getTime())
-
   const displayedPayments = showAllPayments ? allPayments.filter(p => p.received !== false) : thisMonthPayments
+
+  // ===== Money Due Schedule (combined receivables + payables, by date) =====
+  type DueItem = { id: string; date: Date; dir: 'in' | 'out'; amount: number; label: string; sub: string; dealId?: string; deal?: any; expenseId?: string }
+  const dueItems: DueItem[] = []
+
+  // Receivable: advance pending with deadline
+  deals.forEach(d => {
+    if (!d.advanceReceived && d.advanceDeadline && ['pi_sent', 'approval_pending', 'production', 'dispatch_ready', 'dispatched'].includes(d.stage)) {
+      dueItems.push({ id: `adv-${d.id}`, date: new Date(d.advanceDeadline), dir: 'in', amount: d.advanceAmount || (d.quotedAmount ? d.quotedAmount * 0.5 : 0), label: d.customerCompany, sub: `Advance · ${d.dealNumber}`, dealId: d.id, deal: d })
+    }
+    // Receivable: balance pending with deadline
+    if (!d.balancePaid && d.balanceDeadline && ['dispatched', 'installation', 'completed'].includes(d.stage)) {
+      dueItems.push({ id: `bal-${d.id}`, date: new Date(d.balanceDeadline), dir: 'in', amount: d.balanceAmount || 0, label: d.customerCompany, sub: `Balance · ${d.dealNumber}`, dealId: d.id, deal: d })
+    }
+  })
+  // Receivable: scheduled incoming payments
+  allPayments.filter(p => p.received === false && p.scheduledDate).forEach(p => {
+    dueItems.push({ id: `pay-${p.id}`, date: new Date(p.scheduledDate), dir: 'in', amount: p.amount, label: p.deal?.customerCompany || 'Unknown', sub: `${p.type} · ${p.deal?.dealNumber || ''}`, dealId: p.deal?.id, deal: p.deal })
+  })
+  // Payable: scheduled expenses
+  expenses.filter(e => e.paid === false && e.dueDate).forEach(e => {
+    dueItems.push({ id: `exp-${e.id}`, date: new Date(e.dueDate), dir: 'out', amount: e.amount, label: e.vendorName || e.category, sub: `${e.category.replace('_', ' ')}`, expenseId: e.id })
+  })
+
+  dueItems.sort((a, b) => a.date.getTime() - b.date.getTime())
+
+  const in7 = new Date(today); in7.setDate(in7.getDate() + 7)
+  const in30 = new Date(today); in30.setDate(in30.getDate() + 30)
+  const buckets = {
+    overdue: dueItems.filter(i => i.date < today),
+    week: dueItems.filter(i => i.date >= today && i.date < in7),
+    month: dueItems.filter(i => i.date >= in7 && i.date < in30),
+    later: dueItems.filter(i => i.date >= in30),
+  }
+  const sumBy = (items: DueItem[], dir: 'in' | 'out') => items.filter(i => i.dir === dir).reduce((s, i) => s + i.amount, 0)
+  const totalToReceive = sumBy(dueItems, 'in')
+  const totalToPay = sumBy(dueItems, 'out')
+
+  const BUCKET_META: { key: keyof typeof buckets; label: string; tone: string }[] = [
+    { key: 'overdue', label: 'Overdue', tone: 'text-red-600' },
+    { key: 'week', label: 'Next 7 days', tone: 'text-amber-600' },
+    { key: 'month', label: 'Next 30 days', tone: 'text-blue-600' },
+    { key: 'later', label: 'Later', tone: 'text-gray-500' },
+  ]
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
@@ -376,38 +439,91 @@ export default function AccountsPage() {
         </CardContent></Card>
       </div>
 
-      {/* Upcoming scheduled payments */}
-      {scheduledPayments.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-blue-600" /> Scheduled / Expected Payments
-              <span className="ml-auto text-xs font-normal bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">{scheduledPayments.length}</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {scheduledPayments.map((p: any) => {
-                const daysUntil = Math.ceil((new Date(p.scheduledDate).getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+      {/* Money Due Schedule */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-blue-600" /> Money Due Schedule
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {/* Receive / Pay / Net summary */}
+          <div className="grid grid-cols-3 gap-3 mb-5">
+            <div className="rounded-lg border border-green-100 bg-green-50 p-3">
+              <p className="text-xs text-green-700 font-medium">To Receive</p>
+              <p className="text-lg font-bold text-green-700 mt-0.5">{formatCurrency(totalToReceive)}</p>
+            </div>
+            <div className="rounded-lg border border-red-100 bg-red-50 p-3">
+              <p className="text-xs text-red-700 font-medium">To Pay</p>
+              <p className="text-lg font-bold text-red-700 mt-0.5">{formatCurrency(totalToPay)}</p>
+            </div>
+            <div className={`rounded-lg border p-3 ${totalToReceive - totalToPay >= 0 ? 'border-blue-100 bg-blue-50' : 'border-amber-100 bg-amber-50'}`}>
+              <p className={`text-xs font-medium ${totalToReceive - totalToPay >= 0 ? 'text-blue-700' : 'text-amber-700'}`}>Net Expected</p>
+              <p className={`text-lg font-bold mt-0.5 ${totalToReceive - totalToPay >= 0 ? 'text-blue-700' : 'text-amber-700'}`}>{formatCurrency(totalToReceive - totalToPay)}</p>
+            </div>
+          </div>
+
+          {dueItems.length === 0 ? (
+            <p className="text-sm text-gray-400 py-4 text-center">No upcoming dues. Set advance/balance deadlines on deals or schedule payments to see them here.</p>
+          ) : (
+            <div className="space-y-5">
+              {BUCKET_META.map(({ key, label, tone }) => {
+                const items = buckets[key]
+                if (items.length === 0) return null
+                const bIn = sumBy(items, 'in')
+                const bOut = sumBy(items, 'out')
                 return (
-                  <div key={p.id} className={`flex items-center justify-between p-3 rounded-lg border ${daysUntil <= 2 ? 'border-amber-200 bg-amber-50' : 'border-gray-200 bg-white'}`}>
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">{p.deal?.customerCompany}</p>
-                      <p className="text-xs text-gray-500">{p.deal?.dealNumber} · {p.type} · {formatCurrency(p.amount)}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className={`text-sm font-medium ${daysUntil <= 2 ? 'text-amber-700' : 'text-gray-700'}`}>
-                        {daysUntil === 0 ? 'Today' : daysUntil === 1 ? 'Tomorrow' : `In ${daysUntil} days`}
+                  <div key={key}>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className={`text-xs font-semibold uppercase tracking-wide ${tone}`}>{label}</p>
+                      <p className="text-xs text-gray-500">
+                        {bIn > 0 && <span className="text-green-600 font-medium">+{formatCurrency(bIn)}</span>}
+                        {bIn > 0 && bOut > 0 && ' · '}
+                        {bOut > 0 && <span className="text-red-600 font-medium">−{formatCurrency(bOut)}</span>}
                       </p>
-                      <p className="text-xs text-gray-400">{formatDate(p.scheduledDate)}</p>
+                    </div>
+                    <div className="space-y-1.5">
+                      {items.map(item => {
+                        const daysUntil = Math.ceil((item.date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+                        const when = daysUntil < 0 ? `${Math.abs(daysUntil)}d overdue` : daysUntil === 0 ? 'Today' : daysUntil === 1 ? 'Tomorrow' : `in ${daysUntil}d`
+                        return (
+                          <div key={item.id} className={`flex items-center gap-3 p-2.5 rounded-lg border ${item.dir === 'in' ? 'border-gray-200 bg-white' : 'border-red-100 bg-red-50/40'}`}>
+                            {item.dir === 'in'
+                              ? <ArrowDownCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+                              : <ArrowUpCircle className="w-4 h-4 text-red-500 flex-shrink-0" />}
+                            <div className="flex-1 min-w-0">
+                              {item.dealId
+                                ? <Link href={`/dashboard/deals/${item.dealId}`} className="text-sm font-medium text-gray-900 hover:text-blue-600 truncate block">{item.label}</Link>
+                                : <p className="text-sm font-medium text-gray-900 truncate">{item.label}</p>}
+                              <p className="text-xs text-gray-500 truncate">{item.sub}</p>
+                            </div>
+                            <div className="text-right flex-shrink-0">
+                              <p className={`text-sm font-semibold ${item.dir === 'in' ? 'text-green-700' : 'text-red-700'}`}>
+                                {item.dir === 'in' ? '+' : '−'}{formatCurrency(item.amount)}
+                              </p>
+                              <p className={`text-xs ${daysUntil < 0 ? 'text-red-500' : 'text-gray-400'}`}>{formatDate(item.date.toISOString())} · {when}</p>
+                            </div>
+                            {item.dir === 'in' && item.deal && (
+                              <Button size="sm" variant="outline" onClick={() => setPaymentModal(item.deal)}>
+                                <Plus className="w-3.5 h-3.5" />
+                              </Button>
+                            )}
+                            {item.dir === 'out' && item.expenseId && (
+                              <Button size="sm" variant="outline" onClick={() => markExpensePaid(item.expenseId!)}>
+                                <CheckCircle className="w-3.5 h-3.5 mr-1" /> Paid
+                              </Button>
+                            )}
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
                 )
               })}
             </div>
-          </CardContent>
-        </Card>
-      )}
+          )}
+        </CardContent>
+      </Card>
 
       {/* Advance Pending */}
       <Card>

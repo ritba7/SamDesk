@@ -35,7 +35,7 @@ export function generateQuote(deal: any): void {
   doc.setFont('helvetica', 'normal')
   doc.text('SINCE 1992', margin, 18)
   doc.setFontSize(7.5)
-  doc.text('B-137, Noida Rd, B Block, Sector 6, Noida, 201301, U.P., INDIA', pageW - margin, 8, { align: 'right' })
+  doc.text('H-161, Site V, UPSIDA, Kasna, Greater Noida 201310, U.P.', pageW - margin, 8, { align: 'right' })
   doc.text('Ph: 9810065139  |  samproducts1992@gmail.com  |  samproducts25@gmail.com', pageW - margin, 13, { align: 'right' })
   doc.text('www.samproducts.net  |  GSTIN: 09AAKCS6327D1Z8  |  CIN: U51101UP2007PTC055433', pageW - margin, 18, { align: 'right' })
 
@@ -49,7 +49,8 @@ export function generateQuote(deal: any): void {
   y += 12
 
   const today = new Date()
-  const quoteNum = `SPPL/AS/${formatDDMMYY(today)}`
+  const productCode = deal.productInterest === 'air_curtain' ? 'AC' : 'AS'
+  const quoteNum = `SPPL/${productCode}/${formatDDMMYY(today)}`
   doc.setFontSize(9)
   doc.setFont('helvetica', 'normal')
   doc.setTextColor(0, 0, 0)
@@ -79,7 +80,8 @@ export function generateQuote(deal: any): void {
   doc.setFont('helvetica', 'normal')
   doc.text('Dear Sir,', margin, y)
   y += 5
-  doc.text('We are pleased to Quote as follows for your requirement of AIR SHOWERS.', margin, y)
+  const productLabel = deal.productInterest === 'air_curtain' ? 'AIR CURTAINS' : 'AIR SHOWERS'
+  doc.text(`We are pleased to Quote as follows for your requirement of ${productLabel}.`, margin, y)
   y += 8
 
   const motorBrand = deal.motorBrand === 'other' ? deal.motorBrandOther : deal.motorBrand
@@ -130,23 +132,28 @@ export function generateQuote(deal: any): void {
   y += 36
 
   const basicPrice = deal.quotedAmount || 0
-  const gstAmount = basicPrice * 0.18
-  const totalWithGst = basicPrice + gstAmount
+  const qty = deal.quantity || 1
+  const discPercent = deal.discountPercent || 0
+  const price = basicPrice * qty
+  const priceAfterDisc = price * (1 - discPercent / 100)
+  const total = priceAfterDisc
+  const gstAmount = total * 0.18
+  const totalWithGst = total + gstAmount
   const fmt = (n: number) => n > 0 ? `₹ ${n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'
 
   autoTable(doc, {
     startY: y,
-    head: [['Sl No', 'Model # Size', 'Basic Price (INR)', 'Qty', 'Price', 'Disc %', 'Price (After Disc)', 'Remarks']],
+    head: [['Sl No', 'Model # Size', 'Basic Price (INR)', 'Qty', 'Price', 'Disc %', 'Price (After Disc)']],
     body: [
-      ['1', `${deal.dealNumber || '—'}\n${outerDims}`, fmt(basicPrice), '1', fmt(basicPrice), '0%', fmt(basicPrice), ''],
-      [{ content: 'TOTAL', colSpan: 4, styles: { fontStyle: 'bold', halign: 'right' } }, { content: fmt(basicPrice), colSpan: 4, styles: { fontStyle: 'bold' } }],
-      [{ content: 'ADD GST (@18%) HSN CODE 84145930', colSpan: 4, styles: { halign: 'right' } }, { content: fmt(gstAmount), colSpan: 4 }],
-      [{ content: 'TOTAL (with GST)', colSpan: 4, styles: { fontStyle: 'bold', textColor: RED, halign: 'right' } }, { content: fmt(totalWithGst), colSpan: 4, styles: { fontStyle: 'bold', textColor: RED } }],
+      ['1', `${deal.dealNumber || '—'}\n${outerDims}`, fmt(basicPrice), String(qty), fmt(price), `${discPercent}%`, fmt(priceAfterDisc)],
+      [{ content: 'TOTAL', colSpan: 6, styles: { fontStyle: 'bold', halign: 'right' } }, { content: fmt(total), styles: { fontStyle: 'bold' } }],
+      [{ content: 'Add GST @18% (HSN 84145930)', colSpan: 6, styles: { halign: 'right' } }, { content: fmt(gstAmount) }],
+      [{ content: 'GRAND TOTAL (incl. GST)', colSpan: 6, styles: { fontStyle: 'bold', textColor: RED, halign: 'right' } }, { content: fmt(totalWithGst), styles: { fontStyle: 'bold', textColor: RED } }],
     ],
     theme: 'grid',
     headStyles: { fillColor: YELLOW, textColor: [0, 0, 0], fontStyle: 'bold', fontSize: 8 },
     bodyStyles: { fontSize: 8 },
-    columnStyles: { 0: { cellWidth: 10 }, 1: { cellWidth: 40 }, 2: { cellWidth: 25 }, 3: { cellWidth: 10 }, 4: { cellWidth: 22 }, 5: { cellWidth: 13 }, 6: { cellWidth: 28 } },
+    columnStyles: { 0: { cellWidth: 12 }, 1: { cellWidth: 45 }, 2: { cellWidth: 28 }, 3: { cellWidth: 12 }, 4: { cellWidth: 26 }, 5: { cellWidth: 15 }, 6: { cellWidth: 28 } },
     margin: { left: margin, right: margin },
   })
 
@@ -175,7 +182,7 @@ export function generateQuote(deal: any): void {
   const installScope = deal.installationType === 'customer' ? 'Customer Scope' : 'SAM Products Scope'
   autoTable(doc, {
     startY: y,
-    head: [['', 'COMMERCIALS', 'MODEL: AIR SHOWER']],
+    head: [['', 'COMMERCIALS', `MODEL: ${productLabel === 'AIR CURTAINS' ? 'AIR CURTAIN' : 'AIR SHOWER'}`]],
     body: [
       ['I', 'DISPATCH', '7-10 WORKING DAYS FROM RECEIPT OF PURCHASE ORDER & ADVANCE PAYMENT'],
       ['II', 'INSTALLATION', installScope],

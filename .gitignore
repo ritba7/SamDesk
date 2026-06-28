@@ -37,3 +37,6 @@ next-env.d.ts
 .claude/
 prisma/prisma/
 *.db
+
+# environment
+.env

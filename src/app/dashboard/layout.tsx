@@ -6,7 +6,7 @@ import Link from 'next/link'
 import {
   Wind, LayoutDashboard, FileText, CheckSquare, Factory,
   Package, BarChart3, LogOut, ChevronLeft, ChevronRight, Menu, User, Bell, CreditCard,
-  Users, AlertCircle, Clock, CalendarDays
+  Users, AlertCircle, Clock, CalendarDays, Settings
 } from 'lucide-react'
 import { cn, ROLES } from '@/lib/utils'
 
@@ -28,6 +28,7 @@ const navItems: NavItem[] = [
   { href: '/dashboard/followups',  label: 'Follow-ups',  icon: Bell,            roles: ['director', 'vp', 'accounts', 'sales'] },
   { href: '/dashboard/accounts',   label: 'Accounts',    icon: CreditCard,      roles: ['director', 'accounts'] },
   { href: '/dashboard/workload',   label: 'Workload',    icon: Users,           roles: ['director'] },
+  { href: '/dashboard/settings',   label: 'Settings',    icon: Settings,        roles: ['director', 'vp', 'accounts', 'sales', 'manufacturing', 'design'] },
 ]
 
 interface NotifTask {

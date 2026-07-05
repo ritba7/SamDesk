@@ -6,7 +6,7 @@ import Link from 'next/link'
 import {
   Wind, LayoutDashboard, FileText, CheckSquare, Factory,
   Package, BarChart3, LogOut, ChevronLeft, ChevronRight, Menu, User, Bell, CreditCard,
-  Users, AlertCircle, Clock, CalendarDays, Settings
+  Users, AlertCircle, Clock, CalendarDays, Settings, ClipboardList
 } from 'lucide-react'
 import { cn, ROLES } from '@/lib/utils'
 
@@ -22,6 +22,7 @@ const navItems: NavItem[] = [
   { href: '/dashboard/calendar',   label: 'Calendar',    icon: CalendarDays,    roles: ['director', 'sales_director', 'vp', 'accounts', 'sales', 'manufacturing', 'design'] },
   { href: '/dashboard/deals',      label: 'Leads',       icon: FileText,        roles: ['director', 'sales_director', 'vp', 'accounts', 'design', 'sales'] },
   { href: '/dashboard/tasks',      label: 'Tasks',       icon: CheckSquare,     roles: ['director', 'sales_director', 'vp', 'accounts', 'manufacturing', 'design', 'sales'] },
+  { href: '/dashboard/workorders', label: 'Work Orders', icon: ClipboardList,   roles: ['director', 'sales_director', 'vp', 'accounts', 'manufacturing'] },
   { href: '/dashboard/production', label: 'Production',  icon: Factory,         roles: ['director', 'vp', 'manufacturing'] },
   { href: '/dashboard/inventory',  label: 'Inventory',   icon: Package,         roles: ['director', 'manufacturing'] },
   { href: '/dashboard/analytics',  label: 'Analytics',   icon: BarChart3,       roles: ['director', 'sales_director'] },

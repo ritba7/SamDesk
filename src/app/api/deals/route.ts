@@ -17,7 +17,8 @@ export async function GET(req: NextRequest) {
 
   const user = session.user as any
   if (user.role === 'manufacturing') {
-    where.stage = { in: ['production', 'dispatch_ready', 'dispatched'] }
+    // Manufacturing only sees deals with a fully approved Work Order
+    where.workOrders = { some: { approvedByAccounts: true, vettedByDirector: true } }
   }
   if (user.role === 'sales') {
     // A salesman only ever sees his own deals
@@ -37,6 +38,7 @@ export async function GET(req: NextRequest) {
       productionStages: true,
       quotes: { orderBy: { version: 'desc' }, take: 1 },
       payments: true,
+      workOrders: { orderBy: { createdAt: 'desc' }, select: { id: true, woNumber: true, status: true, approvedByAccounts: true, vettedByDirector: true, deadline: true } },
     },
     orderBy: { updatedAt: 'desc' }
   })

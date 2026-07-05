@@ -188,12 +188,37 @@ export function generateQuote(deal: any): void {
   y = (doc as any).lastAutoTable.finalY + 8
 
   // ---- Commercials ----
-  const basic = deal.quotedAmount || 0
+  // Prefer the Commercials page pricing (basicPrice/discount/finalPrice); fall back to quotedAmount
+  const basic = deal.basicPrice || deal.quotedAmount || 0
+  const hasDiscount = !!deal.basicPrice && !!deal.discountValue
+  const discountAmt = hasDiscount
+    ? (deal.discountType === 'percent' ? basic * Number(deal.discountValue) / 100 : Number(deal.discountValue))
+    : 0
+  const unitFinal = deal.finalPrice || Math.max(0, basic - discountAmt)
   const qty = deal.estimatedQty || 1
-  const lineAmount = basic * qty
+  const lineAmount = unitFinal * qty
   const gst = lineAmount * 0.18
   const grand = lineAmount + gst
   const modelSize = `${deal.modelNumber || deal.dealNumber || 'Air Shower'}\n${outer}`
+
+  // Freight & Assembly rows from Commercials
+  const FREIGHT_MAP: Record<string, string> = {
+    customer_pays: 'Customer to Pay',
+    we_bear: 'We Bear — included',
+    we_ask_extra: `Extra — ${deal.freightAmount ? inr(Number(deal.freightAmount)) : 'at actuals'}`,
+  }
+  const ASSEMBLY_MAP: Record<string, string> = {
+    not_required: 'Not Required',
+    chargeable: `Chargeable — ${deal.assemblyCharge ? inr(Number(deal.assemblyCharge)) : 'extra'}`,
+    included: 'Included in Basic Price',
+    visit_after_supply: `Visit After Supply — extra ${deal.assemblyCharge ? inr(Number(deal.assemblyCharge)) : 'chargeable'}`,
+  }
+  const freightRow: any[] | null = deal.freightBearer
+    ? [{ content: 'Freight', colSpan: 4, styles: { halign: 'right' } }, { content: FREIGHT_MAP[deal.freightBearer] || deal.freightBearer }]
+    : null
+  const assemblyRow: any[] | null = deal.assemblyAtSite
+    ? [{ content: 'Installation / Assembly', colSpan: 4, styles: { halign: 'right' } }, { content: ASSEMBLY_MAP[deal.assemblyAtSite] || deal.assemblyAtSite }]
+    : null
 
   if (y > 230) { doc.addPage(); y = 20 }
 
@@ -201,9 +226,12 @@ export function generateQuote(deal: any): void {
     startY: y,
     head: [['Sl No', 'Model # Size', 'Basic Cost/Pc (INR)', 'Qty', 'Amount']],
     body: [
-      ['1', modelSize, inr(basic), String(qty), inr(lineAmount)] as any,
+      ['1', modelSize, inr(unitFinal), String(qty), inr(lineAmount)] as any,
+      ...(hasDiscount ? [[{ content: `(Basic ${inr(basic)} less discount ${deal.discountType === 'percent' ? `${deal.discountValue}%` : inr(discountAmt)})`, colSpan: 5, styles: { fontSize: 7, textColor: [100, 100, 100] } }] as any] : []),
       [{ content: 'TOTAL', colSpan: 4, styles: { halign: 'right', fontStyle: 'bold' } }, { content: inr(lineAmount), styles: { fontStyle: 'bold' } }] as any,
       [{ content: 'Add GST @18% (HSN 84145930)', colSpan: 4, styles: { halign: 'right' } }, { content: inr(gst) }] as any,
+      ...(freightRow ? [freightRow] : []),
+      ...(assemblyRow ? [assemblyRow] : []),
       [{ content: 'GRAND TOTAL (incl. GST)', colSpan: 4, styles: { halign: 'right', fontStyle: 'bold', textColor: RED } }, { content: inr(grand), styles: { fontStyle: 'bold', textColor: RED } }] as any,
     ],
     theme: 'grid',
@@ -247,6 +275,7 @@ export function generateQuote(deal: any): void {
     'Air Shower supplied in "Plug & Play" unless specified by Buyer in writing.',
     'Assembly at site: ₹40,000/Pc + GST (SAC 998736). Dismantling/Re-assembly extra chargeable.',
     freight,
+    'Shifting & unloading at customer scope. Insurance — freight bearer pays.',
     'Standard Packing (Paper Corrugated + Stretch Film) included. Wooden Crate extra on request.',
     `Inspection: ${inspection}`,
     'Quote Validity: 20 days from date of quote.',

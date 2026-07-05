@@ -156,6 +156,27 @@ model Deal {
   nextFollowUpAt DateTime?
   nextFollowUpMode String? // call, mail
 
+  // Commercials (filled by sales)
+  basicPrice        Float?
+  discountType      String?   // percent, amount
+  discountValue     Float?
+  finalPrice        Float?
+  freightBearer     String?   // customer_pays, we_bear, we_ask_extra
+  freightAmount     Float?
+  assemblyAtSite    String?   // not_required, chargeable, included, visit_after_supply
+  assemblyCharge    Float?
+  warrantyTerms     String?   @default("365 days from date of supply (dispatch) or 419 days from date of intimation of inspection")
+  insuranceNote     String?   @default("Insurance to freight bearer's scope")
+  commercialsDone   Boolean   @default(false)
+
+  // Vetting flow
+  vettingStatus     String    @default("not_submitted") // not_submitted, pending, approved, rejected
+  vettingNote       String?
+  vettedById        String?
+  vettedAt          DateTime?
+  workCode          String?   @unique  // unique code assigned by accounts on approval
+  quoteVetStatus    String    @default("none") // none, requested, vetted
+
   assignedToId    String?
   createdById     String
 
@@ -169,9 +190,42 @@ model Deal {
   productionStages ProductionStage[]
   quotes          Quote[]
   payments        Payment[]
+  proformaInvoices ProformaInvoice[]
+  workOrders      WorkOrder[]
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+model ProformaInvoice {
+  id          String   @id @default(cuid())
+  dealId      String
+  piNumber    String   @unique   // SPPI/MMYY/serial
+  poReference String?  // customer PO number this PI is against
+  amount      Float
+  notes       String?
+  createdById String?
+  released    Boolean  @default(true)
+  deal        Deal     @relation(fields: [dealId], references: [id])
+  workOrder   WorkOrder?
+  createdAt   DateTime @default(now())
+}
+
+model WorkOrder {
+  id            String   @id @default(cuid())
+  dealId        String
+  piId          String?  @unique
+  woNumber      String   @unique  // SPWO/{model}/{MMYY}/{serial}
+  specSnapshot  String?  // JSON snapshot of specs at generation time
+  status        String   @default("pending_approval") // pending_approval, approved, in_production, completed
+  approvedByAccounts Boolean @default(false)
+  approvedByAccountsAt DateTime?
+  vettedByDirector   Boolean @default(false)
+  vettedByDirectorAt DateTime?
+  deadline      DateTime?
+  deal          Deal     @relation(fields: [dealId], references: [id])
+  pi            ProformaInvoice? @relation(fields: [piId], references: [id])
+  createdAt     DateTime @default(now())
 }
 
 model Quote {

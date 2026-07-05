@@ -28,6 +28,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       productionStages: { orderBy: { order: 'asc' } },
       quotes: { orderBy: { version: 'desc' } },
       payments: { orderBy: { date: 'desc' } },
+      proformaInvoices: { orderBy: { createdAt: 'desc' }, include: { workOrder: { select: { woNumber: true, status: true } } } },
+      workOrders: { orderBy: { createdAt: 'desc' } },
     }
   })
 
@@ -64,7 +66,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (newStage) updateData.stage = newStage
 
   // Fields sales may always change; also allowed on finalized deals for non-directors
-  const ALWAYS_EDITABLE = ['stage', 'nextFollowUpAt', 'nextFollowUpMode', 'heatScore']
+  const ALWAYS_EDITABLE = [
+    'stage', 'nextFollowUpAt', 'nextFollowUpMode', 'heatScore',
+    // Vetting flow fields (submit for vetting / request quote vetting)
+    'vettingStatus', 'quoteVetStatus',
+    // Commercials — editable by sales until deal is finalized (finalized guard below still applies)
+    'basicPrice', 'discountType', 'discountValue', 'finalPrice',
+    'freightBearer', 'freightAmount', 'assemblyAtSite', 'assemblyCharge',
+    'warrantyTerms', 'insuranceNote', 'commercialsDone', 'paymentTerms',
+  ]
 
   // Sales cannot overwrite fields that already hold a value — only fill blanks
   if (user.role === 'sales') {
@@ -81,8 +91,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   // dealFinalized itself may only be set by sales/sales_director/director (freeze action).
   if (existing.dealFinalized && !['director', 'sales_director'].includes(user.role)) {
     const NOTES_FIELDS = ['internalNotes', 'lostReason', 'lostNotes', 'querySummary']
+    const FINALIZED_LOCKED = [
+      'basicPrice', 'discountType', 'discountValue', 'finalPrice',
+      'freightBearer', 'freightAmount', 'assemblyAtSite', 'assemblyCharge',
+      'warrantyTerms', 'insuranceNote', 'commercialsDone', 'paymentTerms',
+    ]
     for (const key of Object.keys(updateData)) {
-      if (ALWAYS_EDITABLE.includes(key) || NOTES_FIELDS.includes(key)) continue
+      if ((ALWAYS_EDITABLE.includes(key) && !FINALIZED_LOCKED.includes(key)) || NOTES_FIELDS.includes(key)) continue
       delete updateData[key]
     }
   }
@@ -112,6 +127,22 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     where: { id: params.id },
     data: updateData
   })
+
+  if (updateData.commercialsDone === true) {
+    await prisma.activity.create({
+      data: { dealId: deal.id, userId: user.id, type: 'note', content: 'Commercials updated' }
+    })
+  }
+  if (updateData.vettingStatus === 'pending' && existing.vettingStatus !== 'pending') {
+    await prisma.activity.create({
+      data: { dealId: deal.id, userId: user.id, type: 'note', content: 'Submitted for accounts vetting' }
+    })
+  }
+  if (updateData.quoteVetStatus === 'requested' && existing.quoteVetStatus !== 'requested') {
+    await prisma.activity.create({
+      data: { dealId: deal.id, userId: user.id, type: 'note', content: 'Quote vetting requested from accounts' }
+    })
+  }
 
   if (newStage && newStage !== existing.stage) {
     await prisma.activity.create({

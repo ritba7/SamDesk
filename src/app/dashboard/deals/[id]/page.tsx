@@ -8,7 +8,8 @@ import {
   Flame, Thermometer, Snowflake, ChevronRight,
   Activity, DollarSign, Factory, Calendar,
   MessageSquare, AlertCircle, Check, Download,
-  Shield, Phone, Mail as MailIcon, Pencil, Copy, TrendingUp, Edit, Star, Lock
+  Shield, Phone, Mail as MailIcon, Pencil, Copy, TrendingUp, Edit, Star, Lock,
+  IndianRupee, ShieldCheck, Send, ClipboardList
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -72,6 +73,13 @@ export default function DealDetailPage() {
 
   // Finalize deal
   const [finalizing, setFinalizing] = useState(false)
+
+  // Vetting + PI
+  const [submittingVetting, setSubmittingVetting] = useState(false)
+  const [requestingQuoteVet, setRequestingQuoteVet] = useState(false)
+  const [piForm, setPiForm] = useState({ amount: '', poReference: '', notes: '' })
+  const [piSaving, setPiSaving] = useState(false)
+  const [piError, setPiError] = useState('')
 
   const user = session?.user as any
   const role = user?.role
@@ -201,6 +209,40 @@ export default function DealDetailPage() {
     setFinalizing(false)
   }
 
+  const submitForVetting = async () => {
+    if (!window.confirm('Submit this deal to Accounts for vetting? Ensure all technicals and commercials are confirmed against the customer PO.')) return
+    setSubmittingVetting(true)
+    await fetch(`/api/deals/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ vettingStatus: 'pending' }) })
+    await fetchDeal()
+    setSubmittingVetting(false)
+  }
+
+  const requestQuoteVetting = async () => {
+    setRequestingQuoteVet(true)
+    await fetch(`/api/deals/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ quoteVetStatus: 'requested' }) })
+    await fetchDeal()
+    setRequestingQuoteVet(false)
+  }
+
+  const createPI = async () => {
+    if (!piForm.amount) return
+    setPiSaving(true)
+    setPiError('')
+    const res = await fetch('/api/pi', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dealId: id, amount: parseFloat(piForm.amount), poReference: piForm.poReference || undefined, notes: piForm.notes || undefined }),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      setPiError(err.error || 'Failed to create PI')
+    } else {
+      setPiForm({ amount: '', poReference: '', notes: '' })
+    }
+    await fetchDeal()
+    setPiSaving(false)
+  }
+
   const toggleHighlight = async (activityId: string, highlighted: boolean) => {
     await fetch('/api/activities', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: activityId, highlighted: !highlighted }) })
     await fetchDeal()
@@ -230,6 +272,13 @@ export default function DealDetailPage() {
 
   const hasSpecs = deal.material || deal.motorType || deal.outerWidth || deal.innerWidth || deal.freightPaidBy || deal.installationType || deal.paymentTerms || deal.freightTerms || deal.inspectionTerms
 
+  const canCommercials = ['sales', 'sales_director', 'director'].includes(role)
+  const canSubmitVetting = canCommercials && deal.commercialsDone && hasSpecs
+    && ['not_submitted', 'rejected'].includes(deal.vettingStatus)
+  const isAccountsOrDirector = ['accounts', 'director'].includes(role)
+  const woNumber = deal.workOrders?.[0]?.woNumber
+  const pageTitle = role === 'manufacturing' ? (woNumber || deal.customerCompany) : deal.customerCompany
+
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       <div className="flex items-start justify-between">
@@ -237,7 +286,7 @@ export default function DealDetailPage() {
           <Link href="/dashboard/deals"><Button variant="ghost" size="icon"><ArrowLeft className="w-4 h-4" /></Button></Link>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-xl font-bold text-gray-900">{deal.customerCompany}</h1>
+              <h1 className="text-xl font-bold text-gray-900">{pageTitle}</h1>
               <HeatBadge score={deal.heatScore} />
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getStageColor(deal.stage)}`}>{getStageLabel(deal.stage)}</span>
               {deal.dealFinalized && (
@@ -245,9 +294,29 @@ export default function DealDetailPage() {
                   <Lock className="w-3 h-3" /> FINALIZED
                 </span>
               )}
+              {deal.vettingStatus === 'pending' && (
+                <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold bg-amber-100 text-amber-700">
+                  <Clock className="w-3 h-3" /> Vetting Pending
+                </span>
+              )}
+              {deal.vettingStatus === 'approved' && (
+                <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold bg-green-100 text-green-700">
+                  <ShieldCheck className="w-3 h-3" /> Vetted ✓ {deal.workCode}
+                </span>
+              )}
+              {deal.vettingStatus === 'rejected' && (
+                <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold bg-red-100 text-red-700" title={deal.vettingNote || ''}>
+                  <AlertCircle className="w-3 h-3" /> Vetting Rejected{deal.vettingNote ? ` — ${deal.vettingNote}` : ''}
+                </span>
+              )}
+              {woNumber && (
+                <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold bg-blue-100 text-blue-700 font-mono">
+                  <ClipboardList className="w-3 h-3" /> {woNumber}
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
-              <span className="font-mono">{deal.serialNumber || deal.dealNumber}</span>
+              <span className="font-mono">{deal.serialNumber || deal.dealNumber}{deal.workCode ? ` · ${deal.workCode}` : ''}</span>
               <span>&middot;</span><span>POC: {deal.customerName}</span>
               {deal.customerState && <><span>&middot;</span><span>{deal.customerState}</span></>}
             </div>
@@ -262,6 +331,11 @@ export default function DealDetailPage() {
                   <Button size="sm"><Pencil className="w-3 h-3 mr-1" />Edit Deal</Button>
                 </Link>
               )}
+              {canCommercials && (
+                <Link href={`/dashboard/deals/${id}/commercials`}>
+                  <Button size="sm" className="bg-green-600 hover:bg-green-700"><IndianRupee className="w-3 h-3 mr-1" />Commercials</Button>
+                </Link>
+              )}
               <Button variant="destructive" size="sm" onClick={() => changeStage('closed_lost')}>Mark Lost</Button>
             </div>
             <div className="flex items-center gap-2 mt-2 flex-wrap justify-end">
@@ -271,6 +345,11 @@ export default function DealDetailPage() {
               {canFinalize && (
                 <Button variant="outline" size="sm" onClick={finalizeDeal} disabled={finalizing} className="border-emerald-300 text-emerald-700 hover:bg-emerald-50">
                   <Lock className="w-3 h-3 mr-1" />{finalizing ? 'Finalizing…' : 'Finalize & Freeze Deal'}
+                </Button>
+              )}
+              {canSubmitVetting && (
+                <Button variant="outline" size="sm" onClick={submitForVetting} disabled={submittingVetting} className="border-amber-300 text-amber-700 hover:bg-amber-50">
+                  <Send className="w-3 h-3 mr-1" />{submittingVetting ? 'Submitting…' : deal.vettingStatus === 'rejected' ? 'Resubmit for Vetting' : 'Submit for Vetting'}
                 </Button>
               )}
             </div>
@@ -779,17 +858,87 @@ export default function DealDetailPage() {
               <div className="flex flex-col gap-3">
                 <div className="flex items-start gap-4 p-4 rounded-lg border border-gray-200 bg-white">
                   <FileText className="w-8 h-8 text-blue-500 flex-shrink-0 mt-0.5" />
-                  <div className="flex-1"><p className="text-sm font-medium text-gray-900">Quotation</p><p className="text-xs text-gray-500 mt-0.5">Generate a quote PDF in SAM PRODUCTS format.</p></div>
-                  <Button size="sm" onClick={() => generateQuote(deal)} className="flex items-center gap-1.5"><Download className="w-3.5 h-3.5" />Generate Quote</Button>
-                </div>
-                {canEdit && (
-                  <div className="flex items-start gap-4 p-4 rounded-lg border border-gray-200 bg-white">
-                    <FileText className="w-8 h-8 text-green-500 flex-shrink-0 mt-0.5" />
-                    <div className="flex-1"><p className="text-sm font-medium text-gray-900">Proforma Invoice (PI)</p><p className="text-xs text-gray-500 mt-0.5">Generate a PI with {deal.customerState === 'Uttar Pradesh' ? 'CGST + SGST (9% + 9%)' : 'IGST (18%)'} — HSN 84145930.</p></div>
-                    <Button size="sm" variant="outline" onClick={() => generatePI(deal)} className="flex items-center gap-1.5"><Download className="w-3.5 h-3.5" />Generate PI</Button>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-medium text-gray-900">Quotation</p>
+                      {deal.quoteVetStatus === 'vetted' && (
+                        <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold bg-green-100 text-green-700">
+                          <ShieldCheck className="w-3 h-3" /> Quote Vetted by Accounts ✓
+                        </span>
+                      )}
+                      {deal.quoteVetStatus === 'requested' && (
+                        <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-amber-100 text-amber-700">Quote vetting requested</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5">Generate a quote PDF in SAM PRODUCTS format.</p>
                   </div>
-                )}
+                  <div className="flex flex-col items-end gap-2">
+                    <Button size="sm" onClick={() => generateQuote(deal)} className="flex items-center gap-1.5"><Download className="w-3.5 h-3.5" />Generate Quote</Button>
+                    {role === 'sales' && deal.quoteVetStatus === 'none' && (
+                      <Button size="sm" variant="outline" onClick={requestQuoteVetting} disabled={requestingQuoteVet}>
+                        <Send className="w-3 h-3 mr-1" />{requestingQuoteVet ? 'Requesting…' : 'Request Quote Vetting'}
+                      </Button>
+                    )}
+                  </div>
+                </div>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Proforma Invoices */}
+          <Card className="mt-4">
+            <CardHeader>
+              <CardTitle className="text-sm flex items-center gap-2"><FileText className="w-4 h-4 text-green-600" /> Proforma Invoices</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {(!deal.proformaInvoices || deal.proformaInvoices.length === 0) ? (
+                <p className="text-sm text-gray-400">No PIs released yet.{deal.vettingStatus !== 'approved' ? ' Deal must be vetted & approved by accounts first.' : ''}</p>
+              ) : (
+                <div className="space-y-2">
+                  {deal.proformaInvoices.map((pi: any) => (
+                    <div key={pi.id} className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 bg-white">
+                      <FileText className="w-5 h-5 text-green-500 flex-shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-gray-900 font-mono">{pi.piNumber}</p>
+                        <p className="text-xs text-gray-500">
+                          {pi.poReference ? `PO: ${pi.poReference} · ` : ''}{formatCurrency(pi.amount)} · {formatDate(pi.createdAt)}
+                          {pi.workOrder ? ` · WO: ${pi.workOrder.woNumber}` : ''}
+                        </p>
+                        {pi.notes && <p className="text-xs text-gray-400 mt-0.5">{pi.notes}</p>}
+                      </div>
+                      {isAccountsOrDirector && (
+                        <Button size="sm" variant="outline" onClick={() => generatePI(deal, pi.piNumber)} className="flex items-center gap-1.5">
+                          <Download className="w-3.5 h-3.5" />PDF
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {isAccountsOrDirector && (
+                <div className="border-t pt-4 space-y-3">
+                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">New PI (auto-generates Work Order)</p>
+                  {piError && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded p-2">{piError}</p>}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Amount (₹) *</label>
+                      <input type="number" value={piForm.amount} onChange={e => setPiForm(f => ({ ...f, amount: e.target.value }))} className="w-full h-9 px-3 rounded-md border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="0" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">PO Reference</label>
+                      <input type="text" value={piForm.poReference} onChange={e => setPiForm(f => ({ ...f, poReference: e.target.value }))} className="w-full h-9 px-3 rounded-md border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Customer PO number" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Notes</label>
+                      <input type="text" value={piForm.notes} onChange={e => setPiForm(f => ({ ...f, notes: e.target.value }))} className="w-full h-9 px-3 rounded-md border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Optional" />
+                    </div>
+                  </div>
+                  <Button size="sm" onClick={createPI} disabled={piSaving || !piForm.amount || deal.vettingStatus !== 'approved'}>
+                    {piSaving ? 'Releasing…' : 'Release PI + Auto Work Order'}
+                  </Button>
+                  {deal.vettingStatus !== 'approved' && <p className="text-xs text-amber-600">PI can only be released after the deal is vetted &amp; approved by accounts.</p>}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

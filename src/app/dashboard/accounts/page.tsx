@@ -1,7 +1,7 @@
 'use client'
 import { useSession } from 'next-auth/react'
 import { useEffect, useState } from 'react'
-import { Download, ChevronDown, ChevronUp, Plus, X, ArrowDownCircle, ArrowUpCircle, Calendar, CheckCircle } from 'lucide-react'
+import { Download, ChevronDown, ChevronUp, Plus, X, ArrowDownCircle, ArrowUpCircle, Calendar, CheckCircle, ShieldCheck, XCircle, FileText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatCurrency, formatDate, getStageLabel } from '@/lib/utils'
@@ -261,6 +261,151 @@ function ExpenseModal({ onClose, onSave, deals }: { onClose: () => void, onSave:
   )
 }
 
+// Vetting Queue card — spec sheet + commercials review, Approve / Reject
+function VettingQueue({ onChanged }: { onChanged: () => void }) {
+  const [items, setItems] = useState<any[]>([])
+  const [quoteRequests, setQuoteRequests] = useState<any[]>([])
+  const [expanded, setExpanded] = useState<string | null>(null)
+  const [notes, setNotes] = useState<Record<string, string>>({})
+  const [acting, setActing] = useState<string | null>(null)
+
+  const load = () => fetch('/api/vetting').then(r => r.json()).then(d => {
+    setItems(Array.isArray(d?.deals) ? d.deals : [])
+    setQuoteRequests(Array.isArray(d?.quoteRequests) ? d.quoteRequests : [])
+  }).catch(() => {})
+
+  useEffect(() => { load() }, [])
+
+  const act = async (dealId: string, action: 'approve' | 'reject') => {
+    setActing(dealId)
+    await fetch('/api/vetting', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dealId, action, note: notes[dealId] || undefined }),
+    })
+    setActing(null)
+    load()
+    onChanged()
+  }
+
+  const markQuoteVetted = async (dealId: string) => {
+    setActing(dealId + '-quote')
+    await fetch(`/api/deals/${dealId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ quoteVetStatus: 'vetted' }),
+    })
+    setActing(null)
+    load()
+  }
+
+  const specRow = (label: string, value: any) =>
+    value !== null && value !== undefined && value !== '' ? (
+      <div className="flex justify-between gap-3"><span className="text-gray-500">{label}</span><span className="text-right capitalize">{String(value).replace(/_/g, ' ')}</span></div>
+    ) : null
+
+  if (items.length === 0 && quoteRequests.length === 0) return null
+
+  return (
+    <Card className="border-amber-200">
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          <ShieldCheck className="w-4 h-4 text-amber-600" /> Vetting Queue
+          <span className="ml-auto text-xs font-normal bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full">{items.length + quoteRequests.length}</span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {items.map(d => (
+          <div key={d.id} className="rounded-lg border border-gray-200 bg-white">
+            <button onClick={() => setExpanded(expanded === d.id ? null : d.id)} className="w-full flex items-center gap-3 p-3 text-left">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-900 font-mono">{d.serialNumber || d.dealNumber}</p>
+                <p className="text-xs text-gray-500">
+                  Model: {d.modelNumber || '—'} · Basic {d.basicPrice ? formatCurrency(d.basicPrice) : '—'} · Final {d.finalPrice ? formatCurrency(d.finalPrice) : '—'}
+                </p>
+              </div>
+              {expanded === d.id ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+            </button>
+            {expanded === d.id && (
+              <div className="border-t border-gray-100 p-4 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Spec Sheet</p>
+                    {specRow('Model', d.modelNumber)}
+                    {specRow('Configuration', d.airShowerConfig)}
+                    {specRow('Application', d.application)}
+                    {specRow('Users / Cycle', d.numberOfUsers)}
+                    {specRow('Entry Type', d.entryType)}
+                    {specRow('Air Flow Time', d.airFlowTime ? `${d.airFlowTime} sec` : null)}
+                    {specRow('Door Type', d.doorType)}
+                    {specRow('Door Leaf', d.doorLeaf)}
+                    {specRow('Flooring', d.flooringRequired ? (d.flooringType || 'required') : 'not required')}
+                    {specRow('Material', d.material)}
+                    {specRow('Motor', d.motorType ? `${d.motorType} ${d.motorBrand === 'other' ? d.motorBrandOther || '' : d.motorBrand || ''}` : null)}
+                    {specRow('Outer W×H×D', d.outerWidth ? `${d.outerWidth}×${d.outerHeight}×${d.outerDepth} mm` : null)}
+                    {specRow('Inner W×H×D', d.innerWidth ? `${d.innerWidth}×${d.innerHeight}×${d.innerDepth} mm` : null)}
+                    {specRow('Input Power', d.inputPower)}
+                    {specRow('Spec Notes', d.specNotes)}
+                  </div>
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Commercials</p>
+                    {specRow('Basic Price', d.basicPrice ? formatCurrency(d.basicPrice) : null)}
+                    {specRow('Discount', d.discountValue ? `${d.discountValue}${d.discountType === 'percent' ? '%' : ' ₹'}` : null)}
+                    {specRow('Final Price', d.finalPrice ? formatCurrency(d.finalPrice) : null)}
+                    {specRow('Quoted Amount', d.quotedAmount ? formatCurrency(d.quotedAmount) : null)}
+                    {specRow('Freight', d.freightBearer)}
+                    {specRow('Freight Amount', d.freightAmount ? formatCurrency(d.freightAmount) : null)}
+                    {specRow('Assembly', d.assemblyAtSite)}
+                    {specRow('Assembly Charge', d.assemblyCharge ? formatCurrency(d.assemblyCharge) : null)}
+                    {specRow('Payment Terms', d.paymentTerms)}
+                    {specRow('Warranty', d.warrantyTerms)}
+                    {specRow('Insurance', d.insuranceNote)}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    value={notes[d.id] || ''}
+                    onChange={e => setNotes(n => ({ ...n, [d.id]: e.target.value }))}
+                    placeholder="Note (required for reject, optional for approve)"
+                    className={inputCls}
+                  />
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={() => act(d.id, 'approve')} disabled={acting === d.id} className="bg-green-600 hover:bg-green-700">
+                      <CheckCircle className="w-3.5 h-3.5 mr-1" /> {acting === d.id ? 'Working…' : 'OK — Approve & Assign Work Code'}
+                    </Button>
+                    <Button size="sm" variant="destructive" onClick={() => act(d.id, 'reject')} disabled={acting === d.id || !(notes[d.id] || '').trim()}>
+                      <XCircle className="w-3.5 h-3.5 mr-1" /> Reject
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+
+        {quoteRequests.length > 0 && (
+          <div className="pt-2 border-t border-gray-100 space-y-2">
+            <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Quote Vetting Requests</p>
+            {quoteRequests.map(q => (
+              <div key={q.id} className="flex items-center gap-3 p-2.5 rounded-lg border border-gray-200 bg-white">
+                <FileText className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm font-mono text-gray-900">{q.serialNumber || q.dealNumber}</p>
+                  <p className="text-xs text-gray-500">Model {q.modelNumber || '—'}{q.quotedAmount ? ` · Quoted ${formatCurrency(q.quotedAmount)}` : ''}</p>
+                </div>
+                <Button size="sm" variant="outline" onClick={() => markQuoteVetted(q.id)} disabled={acting === q.id + '-quote'}>
+                  <ShieldCheck className="w-3.5 h-3.5 mr-1" /> Mark Quote Vetted
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 export default function AccountsPage() {
   const { data: session } = useSession()
   const [deals, setDeals] = useState<any[]>([])
@@ -453,6 +598,9 @@ export default function AccountsPage() {
           <p className="text-xl font-bold text-gray-700 mt-1">{formatCurrency(totalExpenses)}</p>
         </CardContent></Card>
       </div>
+
+      {/* Vetting Queue */}
+      <VettingQueue onChanged={loadData} />
 
       {/* Money Due Schedule */}
       <Card>

@@ -15,15 +15,17 @@ function HeatBadge({ score }: { score: string }) {
   return <span className="flex items-center gap-1 text-xs font-medium text-blue-600 bg-blue-50 rounded-full px-2 py-0.5"><Snowflake className="w-3 h-3" /> Cold</span>
 }
 
-function DealCard({ deal }: { deal: any }) {
+function DealCard({ deal, role }: { deal: any, role?: string }) {
+  const isMfg = role === 'manufacturing'
+  const woNumber = deal.workOrders?.[0]?.woNumber
   return (
     <Link key={deal.id} href={`/dashboard/deals/${deal.id}`}>
       <Card className="hover:shadow-md hover:border-blue-200 transition-all cursor-pointer h-full">
         <CardContent className="p-5">
           <div className="flex items-start justify-between mb-3">
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-gray-900 truncate">{deal.customerCompany}</p>
-              <p className="text-xs text-gray-400 mt-0.5">{deal.customerName}</p>
+              <p className={`font-semibold text-gray-900 truncate ${isMfg && woNumber ? 'font-mono' : ''}`}>{isMfg ? (woNumber || deal.customerCompany) : deal.customerCompany}</p>
+              {!isMfg && <p className="text-xs text-gray-400 mt-0.5">{deal.customerName}</p>}
             </div>
             <div className="flex flex-col items-end gap-1 ml-2">
               <HeatBadge score={deal.heatScore} />
@@ -132,7 +134,7 @@ export default function DealsPage() {
               <p className="text-gray-400 text-sm">No active deals</p>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                {activeDeals.map(deal => <DealCard key={deal.id} deal={deal} />)}
+                {activeDeals.map(deal => <DealCard key={deal.id} deal={deal} role={user?.role} />)}
               </div>
             )}
           </div>
@@ -147,7 +149,7 @@ export default function DealsPage() {
               </button>
               {showClosed && (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {closedDeals.map(deal => <DealCard key={deal.id} deal={deal} />)}
+                  {closedDeals.map(deal => <DealCard key={deal.id} deal={deal} role={user?.role} />)}
                 </div>
               )}
             </div>

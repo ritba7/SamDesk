@@ -15,6 +15,10 @@ export async function GET(req: NextRequest) {
   const where: any = {}
   if (!all) where.status = 'pending'
   if (assignedTo) where.assignedToId = assignedTo
+  else if (user.role === 'sales_director' && all) {
+    // Sales director sees all sales-team tasks
+    where.assignedTo = { role: { in: ['sales', 'sales_director'] } }
+  }
   else if (user.role !== 'director') where.assignedToId = user.id
 
   const tasks = await prisma.task.findMany({

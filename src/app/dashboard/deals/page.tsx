@@ -39,7 +39,7 @@ function DealCard({ deal }: { deal: any }) {
             </div>
           </div>
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs text-gray-400 font-mono">{deal.dealNumber}</span>
+            <span className="text-xs text-gray-400 font-mono">{deal.serialNumber || deal.dealNumber}</span>
             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getStageColor(deal.stage)}`}>{getStageLabel(deal.stage)}</span>
           </div>
           {(deal.productInterest || deal.source) && (
@@ -48,7 +48,10 @@ function DealCard({ deal }: { deal: any }) {
                 <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">
                   {deal.productInterest === 'air_shower' ? 'Air Shower' :
                    deal.productInterest === 'air_curtain' ? 'Air Curtain' :
-                   deal.productInterest === 'clean_room' ? 'Clean Room' : 'Other'}
+                   deal.productInterest === 'clean_room' ? 'Clean Room' :
+                   deal.productInterest === 'pass_box_static' ? 'Static Pass Box' :
+                   deal.productInterest === 'pass_box_dynamic' ? 'Dynamic Pass Box' :
+                   deal.productOther || 'Other'}
                 </span>
               )}
               {deal.source && (
@@ -90,19 +93,19 @@ export default function DealsPage() {
   }, [])
 
   const filtered = deals.filter(d => {
-    const matchSearch = !search || d.customerName.toLowerCase().includes(search.toLowerCase()) || d.dealNumber.toLowerCase().includes(search.toLowerCase()) || d.customerCompany.toLowerCase().includes(search.toLowerCase())
+    const matchSearch = !search || d.customerName.toLowerCase().includes(search.toLowerCase()) || d.dealNumber.toLowerCase().includes(search.toLowerCase()) || (d.serialNumber || '').toLowerCase().includes(search.toLowerCase()) || d.customerCompany.toLowerCase().includes(search.toLowerCase())
     return matchSearch && (!stageFilter || d.stage === stageFilter) && (!heatFilter || d.heatScore === heatFilter)
   })
 
   const activeDeals = filtered.filter(d => !CLOSED_STAGES.includes(d.stage))
   const closedDeals = filtered.filter(d => CLOSED_STAGES.includes(d.stage))
 
-  const canCreate = ['director', 'vp', 'accounts', 'sales'].includes(user?.role)
+  const canCreate = ['director', 'sales_director', 'vp', 'accounts', 'sales'].includes(user?.role)
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div><h1 className="text-2xl font-bold text-gray-900">Deals</h1><p className="text-gray-500 mt-1">{filtered.length} deals</p></div>
+        <div><h1 className="text-2xl font-bold text-gray-900">Leads</h1><p className="text-gray-500 mt-1">{filtered.length} leads</p></div>
         {canCreate && <Link href="/dashboard/deals/new"><Button><Plus className="w-4 h-4" />New Deal</Button></Link>}
       </div>
       <div className="flex flex-wrap gap-3">

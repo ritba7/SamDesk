@@ -17,8 +17,8 @@ export default function AnalyticsPage() {
   const user = session?.user as any
 
   useEffect(() => {
-    if (status === 'authenticated' && user?.role !== 'director') { router.push('/dashboard'); return }
-    if (status === 'authenticated' && user?.role === 'director') {
+    if (status === 'authenticated' && !['director', 'sales_director'].includes(user?.role)) { router.push('/dashboard'); return }
+    if (status === 'authenticated' && ['director', 'sales_director'].includes(user?.role)) {
       fetch('/api/analytics').then(r => r.json()).then(data => { setAnalytics(data); setLoading(false) })
     }
   }, [status, user?.role])

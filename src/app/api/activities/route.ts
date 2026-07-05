@@ -13,3 +13,15 @@ export async function POST(req: NextRequest) {
   })
   return NextResponse.json(activity)
 }
+
+export async function PATCH(req: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { id, highlighted } = await req.json()
+  if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
+  const activity = await prisma.activity.update({
+    where: { id },
+    data: { highlighted: !!highlighted },
+  })
+  return NextResponse.json(activity)
+}

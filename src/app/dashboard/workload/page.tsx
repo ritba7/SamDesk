@@ -47,7 +47,7 @@ export default function WorkloadPage() {
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login')
     const user = session?.user as any
-    if (status === 'authenticated' && user?.role !== 'director') router.push('/dashboard')
+    if (status === 'authenticated' && !['director', 'sales_director'].includes(user?.role)) router.push('/dashboard')
   }, [status, session, router])
 
   useEffect(() => {

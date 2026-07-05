@@ -19,6 +19,14 @@ export async function GET(req: NextRequest) {
   if (user.role === 'manufacturing') {
     where.stage = { in: ['production', 'dispatch_ready', 'dispatched'] }
   }
+  if (user.role === 'sales') {
+    // A salesman only ever sees his own deals
+    where.OR = [{ assignedToId: user.id }, { createdById: user.id }]
+  }
+  if (user.role === 'accounts') {
+    // Accounts only see finalized deals (vetting/billing)
+    where.dealFinalized = true
+  }
 
   const deals = await prisma.deal.findMany({
     where,
@@ -59,7 +67,27 @@ export async function POST(req: NextRequest) {
     paymentTerms, freightTerms, inspectionTerms, introEmail, tdsDeadline,
     modelNumber, airShowerConfig, application, numberOfUsers, entryType,
     airFlowTime, doorType, flooringRequired, inputPower,
+    productOther, flooringType, doorLeaf,
+    nextFollowUpAt, nextFollowUpMode, firstCallRemarks,
   } = body
+
+  // ---- Serial number generation: {PROD}-{COMP4}-{INITIALS}_{ddmmyy}_{nn} ----
+  const PROD_CODES: Record<string, string> = {
+    air_shower: 'AS', air_curtain: 'AC', pass_box_static: 'PBS',
+    pass_box_dynamic: 'PBD', clean_room: 'CR', other: 'OT',
+  }
+  const prodCode = PROD_CODES[productInterest as string] || 'OT'
+  const comp4 = String(customerCompany || '').replace(/[^a-zA-Z0-9]/g, '').slice(0, 4).toUpperCase() || 'XXXX'
+  const initials = String(user.name || '')
+    .split(/\s+/).filter(Boolean).map((w: string) => w[0]).join('').slice(0, 3).toUpperCase() || 'XX'
+  const now = new Date()
+  const dd = String(now.getDate()).padStart(2, '0')
+  const mm = String(now.getMonth() + 1).padStart(2, '0')
+  const yy = String(now.getFullYear()).slice(-2)
+  const startOfDay = new Date(now); startOfDay.setHours(0, 0, 0, 0)
+  const endOfDay = new Date(now); endOfDay.setHours(23, 59, 59, 999)
+  const todayCount = await prisma.deal.count({ where: { createdAt: { gte: startOfDay, lte: endOfDay } } })
+  const serialNumber = `${prodCode}-${comp4}-${initials}_${dd}${mm}${yy}_${String(todayCount + 1).padStart(2, '0')}`
 
   const deal = await prisma.deal.create({
     data: {
@@ -110,6 +138,12 @@ export async function POST(req: NextRequest) {
       ...(doorType ? { doorType } : {}),
       ...(flooringRequired !== undefined ? { flooringRequired: !!flooringRequired } : {}),
       ...(inputPower ? { inputPower } : {}),
+      ...(productOther ? { productOther } : {}),
+      ...(flooringType ? { flooringType } : {}),
+      ...(doorLeaf ? { doorLeaf } : {}),
+      ...(nextFollowUpAt ? { nextFollowUpAt: new Date(nextFollowUpAt) } : {}),
+      ...(nextFollowUpMode ? { nextFollowUpMode } : {}),
+      serialNumber,
       dealNumber,
       createdById: user.id,
       stage: 'inquiry',
@@ -124,6 +158,45 @@ export async function POST(req: NextRequest) {
       content: `Deal created - Inquiry received from ${deal.customerName}`,
     }
   })
+
+  // Primary contact person from customer fields
+  if (customerName) {
+    await prisma.contactPerson.create({
+      data: {
+        dealId: deal.id,
+        name: customerName,
+        phone: customerPhone || null,
+        email: customerEmail || null,
+        isPrimary: true,
+      }
+    })
+  }
+
+  // Remarks after first call — always logged as a note activity
+  if (firstCallRemarks && String(firstCallRemarks).trim()) {
+    await prisma.activity.create({
+      data: {
+        dealId: deal.id,
+        userId: user.id,
+        type: 'note',
+        content: String(firstCallRemarks).trim(),
+      }
+    })
+  }
+
+  // Compulsory next follow-up → task for the creating user
+  if (nextFollowUpAt) {
+    await prisma.task.create({
+      data: {
+        dealId: deal.id,
+        title: `Follow up (${nextFollowUpMode === 'mail' ? 'Email' : 'Call'}) — ${deal.customerCompany}`,
+        dueDate: new Date(nextFollowUpAt),
+        assignedToId: user.id,
+        createdById: user.id,
+        type: 'follow_up',
+      }
+    })
+  }
 
   // Auto-create tasks on deal creation
 

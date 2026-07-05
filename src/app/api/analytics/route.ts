@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const user = session.user as any
-  if (user.role !== 'director') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!['director', 'sales_director'].includes(user.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const [deals, tasks, payments, productionStages] = await Promise.all([
     prisma.deal.findMany({

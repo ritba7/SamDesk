@@ -15,6 +15,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     include: {
       assignedTo: true,
       createdBy: true,
+      contacts: { orderBy: { createdAt: 'asc' } },
       activities: {
         include: { user: { select: { name: true, role: true } } },
         orderBy: { createdAt: 'desc' }
@@ -31,6 +32,15 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   })
 
   if (!deal) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  const user = session.user as any
+  if (user.role === 'sales' && deal.assignedToId !== user.id && deal.createdById !== user.id) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+  if (user.role === 'accounts' && !deal.dealFinalized) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
   return NextResponse.json(deal)
 }
 
@@ -45,8 +55,39 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const existing = await prisma.deal.findUnique({ where: { id: params.id } })
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
+  // Sales can only touch their own deals
+  if (user.role === 'sales' && existing.assignedToId !== user.id && existing.createdById !== user.id) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
   const updateData: any = { ...rest }
   if (newStage) updateData.stage = newStage
+
+  // Fields sales may always change; also allowed on finalized deals for non-directors
+  const ALWAYS_EDITABLE = ['stage', 'nextFollowUpAt', 'nextFollowUpMode', 'heatScore']
+
+  // Sales cannot overwrite fields that already hold a value — only fill blanks
+  if (user.role === 'sales') {
+    for (const key of Object.keys(updateData)) {
+      if (ALWAYS_EDITABLE.includes(key)) continue
+      const existingValue = (existing as any)[key]
+      if (existingValue !== null && existingValue !== undefined && existingValue !== '') {
+        delete updateData[key]
+      }
+    }
+  }
+
+  // Finalized deals: spec/commercial changes only for director/sales_director.
+  // dealFinalized itself may only be set by sales/sales_director/director (freeze action).
+  if (existing.dealFinalized && !['director', 'sales_director'].includes(user.role)) {
+    const NOTES_FIELDS = ['internalNotes', 'lostReason', 'lostNotes', 'querySummary']
+    for (const key of Object.keys(updateData)) {
+      if (ALWAYS_EDITABLE.includes(key) || NOTES_FIELDS.includes(key)) continue
+      delete updateData[key]
+    }
+  }
+
+  if (updateData.nextFollowUpAt) updateData.nextFollowUpAt = new Date(updateData.nextFollowUpAt)
 
   // Heat score auto-calculation
   const stageForHeat = newStage || existing.stage

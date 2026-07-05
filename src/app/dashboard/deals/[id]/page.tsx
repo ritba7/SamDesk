@@ -8,7 +8,7 @@ import {
   Flame, Thermometer, Snowflake, ChevronRight,
   Activity, DollarSign, Factory, Calendar,
   MessageSquare, AlertCircle, Check, Download,
-  Shield, Phone, Mail as MailIcon, Pencil, Copy, TrendingUp, Edit
+  Shield, Phone, Mail as MailIcon, Pencil, Copy, TrendingUp, Edit, Star, Lock
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -69,6 +69,9 @@ export default function DealDetailPage() {
 
   // Intro email copy
   const [emailCopied, setEmailCopied] = useState(false)
+
+  // Finalize deal
+  const [finalizing, setFinalizing] = useState(false)
 
   const user = session?.user as any
   const role = user?.role
@@ -190,6 +193,19 @@ export default function DealDetailPage() {
     await fetchDeal()
   }
 
+  const finalizeDeal = async () => {
+    if (!window.confirm('Finalize & freeze this deal? Specs and commercials will be locked and the deal becomes visible to Accounts.')) return
+    setFinalizing(true)
+    await fetch(`/api/deals/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dealFinalized: true }) })
+    await fetchDeal()
+    setFinalizing(false)
+  }
+
+  const toggleHighlight = async (activityId: string, highlighted: boolean) => {
+    await fetch('/api/activities', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: activityId, highlighted: !highlighted }) })
+    await fetchDeal()
+  }
+
   const markIntroEmailSent = async () => {
     await fetch('/api/activities', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dealId: id, type: 'email', content: 'Intro email sent to customer' }) })
     await fetchDeal()
@@ -202,8 +218,13 @@ export default function DealDetailPage() {
   const nextStage = currentIdx >= 0 && currentIdx < STAGE_FLOW.length - 1 ? STAGE_FLOW[currentIdx + 1] : null
   const isLost = deal.stage === 'closed_lost'
   const isWon = deal.stage === 'closed_won'
-  const canEdit = ['director', 'vp', 'accounts'].includes(role)
+  const canEdit = ['director', 'vp', 'accounts', 'sales', 'sales_director'].includes(role)
   const canUpdateProduction = ['director', 'manufacturing'].includes(role)
+  // Once finalized, sales can no longer open the edit form (API enforces too)
+  const canOpenEditForm = canEdit && !(deal.dealFinalized && role === 'sales')
+  const canFinalize = ['sales', 'sales_director', 'director'].includes(role)
+    && STAGE_FLOW.indexOf(deal.stage) >= STAGE_FLOW.indexOf('po_received')
+    && !deal.dealFinalized
   const totalPaid = deal.payments.reduce((sum: number, p: any) => sum + p.amount, 0)
   const pendingTasks = deal.tasks.filter((t: any) => t.status === 'pending')
 
@@ -217,18 +238,16 @@ export default function DealDetailPage() {
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-xl font-bold text-gray-900">{deal.customerCompany}</h1>
-              {canEdit && (
-                <Link href={`/dashboard/deals/${id}/edit`}>
-                  <button className="flex items-center gap-1 text-xs px-2 py-1 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-600">
-                    <Edit className="w-3 h-3" /> Edit Deal
-                  </button>
-                </Link>
-              )}
               <HeatBadge score={deal.heatScore} />
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getStageColor(deal.stage)}`}>{getStageLabel(deal.stage)}</span>
+              {deal.dealFinalized && (
+                <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold bg-emerald-100 text-emerald-700">
+                  <Lock className="w-3 h-3" /> FINALIZED
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
-              <span className="font-mono">{deal.dealNumber}</span>
+              <span className="font-mono">{deal.serialNumber || deal.dealNumber}</span>
               <span>&middot;</span><span>POC: {deal.customerName}</span>
               {deal.customerState && <><span>&middot;</span><span>{deal.customerState}</span></>}
             </div>
@@ -236,14 +255,24 @@ export default function DealDetailPage() {
         </div>
         {canEdit && !isLost && !isWon && (
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap justify-end">
               {nextStage && <Button onClick={() => changeStage(nextStage)} disabled={stageLoading} size="sm">Move to {getStageLabel(nextStage)} <ChevronRight className="w-3 h-3" /></Button>}
+              {canOpenEditForm && (
+                <Link href={`/dashboard/deals/${id}/edit`}>
+                  <Button size="sm"><Pencil className="w-3 h-3 mr-1" />Edit Deal</Button>
+                </Link>
+              )}
               <Button variant="destructive" size="sm" onClick={() => changeStage('closed_lost')}>Mark Lost</Button>
             </div>
-            <div className="flex items-center gap-2 mt-2">
+            <div className="flex items-center gap-2 mt-2 flex-wrap justify-end">
               <Button variant="outline" size="sm" onClick={() => setLogType('call')}><Phone className="w-3 h-3 mr-1" />Log Call</Button>
               <Button variant="outline" size="sm" onClick={() => setLogType('email')}><MailIcon className="w-3 h-3 mr-1" />Log Email</Button>
               <Button variant="outline" size="sm" onClick={() => setLogType('negotiation')}><TrendingUp className="w-3 h-3 mr-1" />Log Negotiation</Button>
+              {canFinalize && (
+                <Button variant="outline" size="sm" onClick={finalizeDeal} disabled={finalizing} className="border-emerald-300 text-emerald-700 hover:bg-emerald-50">
+                  <Lock className="w-3 h-3 mr-1" />{finalizing ? 'Finalizing…' : 'Finalize & Freeze Deal'}
+                </Button>
+              )}
             </div>
           </div>
         )}
@@ -498,8 +527,8 @@ export default function DealDetailPage() {
           </CardContent></Card>
           <div className="space-y-3">
             {deal.activities.length === 0 ? <p className="text-gray-400 text-sm text-center py-6">No activity yet</p> :
-              deal.activities.map((act: any) => (
-                <div key={act.id} className="flex gap-3">
+              [...deal.activities].sort((a: any, b: any) => (b.highlighted ? 1 : 0) - (a.highlighted ? 1 : 0)).map((act: any) => (
+                <div key={act.id} className={`flex gap-3 ${act.highlighted ? 'bg-amber-50 border border-amber-200 rounded-lg p-3' : ''}`}>
                   <div className="flex flex-col items-center">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${act.type === 'stage_change' ? 'bg-blue-100' : act.type === 'note' ? 'bg-gray-100' : act.type === 'payment' ? 'bg-green-100' : act.type === 'negotiation' ? 'bg-orange-100' : 'bg-purple-100'}`}>
                       {act.type === 'stage_change' ? <ChevronRight className="w-4 h-4 text-blue-600" /> : act.type === 'note' ? <MessageSquare className="w-4 h-4 text-gray-600" /> : act.type === 'payment' ? <DollarSign className="w-4 h-4 text-green-600" /> : act.type === 'negotiation' ? <TrendingUp className="w-4 h-4 text-orange-600" /> : <Activity className="w-4 h-4 text-purple-600" />}
@@ -507,7 +536,17 @@ export default function DealDetailPage() {
                     <div className="w-px flex-1 bg-gray-200 my-1" />
                   </div>
                   <div className="flex-1 pb-4">
-                    <div className="flex items-center gap-2 mb-1"><span className="text-sm font-medium text-gray-900">{act.user?.name}</span><span className="text-xs text-gray-400">{formatDate(act.createdAt)}</span></div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-sm font-medium text-gray-900">{act.user?.name}</span>
+                      <span className="text-xs text-gray-400">{formatDate(act.createdAt)}</span>
+                      <button
+                        onClick={() => toggleHighlight(act.id, !!act.highlighted)}
+                        title={act.highlighted ? 'Remove highlight' : 'Highlight this activity'}
+                        className={`ml-auto ${act.highlighted ? 'text-amber-500' : 'text-gray-300 hover:text-amber-400'}`}
+                      >
+                        <Star className="w-4 h-4" fill={act.highlighted ? 'currentColor' : 'none'} />
+                      </button>
+                    </div>
                     <p className="text-sm text-gray-700">{act.content}</p>
                     {act.type === 'negotiation' && act.metadata && (() => {
                       try {

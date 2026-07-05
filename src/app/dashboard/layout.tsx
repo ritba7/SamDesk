@@ -18,17 +18,17 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { href: '/dashboard',            label: 'Dashboard',   icon: LayoutDashboard, roles: ['director', 'vp', 'accounts', 'manufacturing', 'design', 'sales'] },
-  { href: '/dashboard/calendar',   label: 'Calendar',    icon: CalendarDays,    roles: ['director', 'vp', 'accounts', 'sales', 'manufacturing', 'design'] },
-  { href: '/dashboard/deals',      label: 'Pipeline',    icon: FileText,        roles: ['director', 'vp', 'accounts', 'design', 'sales'] },
-  { href: '/dashboard/tasks',      label: 'Tasks',       icon: CheckSquare,     roles: ['director', 'vp', 'accounts', 'manufacturing', 'design', 'sales'] },
+  { href: '/dashboard',            label: 'Dashboard',   icon: LayoutDashboard, roles: ['director', 'sales_director', 'vp', 'accounts', 'manufacturing', 'design', 'sales'] },
+  { href: '/dashboard/calendar',   label: 'Calendar',    icon: CalendarDays,    roles: ['director', 'sales_director', 'vp', 'accounts', 'sales', 'manufacturing', 'design'] },
+  { href: '/dashboard/deals',      label: 'Leads',       icon: FileText,        roles: ['director', 'sales_director', 'vp', 'accounts', 'design', 'sales'] },
+  { href: '/dashboard/tasks',      label: 'Tasks',       icon: CheckSquare,     roles: ['director', 'sales_director', 'vp', 'accounts', 'manufacturing', 'design', 'sales'] },
   { href: '/dashboard/production', label: 'Production',  icon: Factory,         roles: ['director', 'vp', 'manufacturing'] },
   { href: '/dashboard/inventory',  label: 'Inventory',   icon: Package,         roles: ['director', 'manufacturing'] },
-  { href: '/dashboard/analytics',  label: 'Analytics',   icon: BarChart3,       roles: ['director'] },
-  { href: '/dashboard/followups',  label: 'Follow-ups',  icon: Bell,            roles: ['director', 'vp', 'accounts', 'sales'] },
+  { href: '/dashboard/analytics',  label: 'Analytics',   icon: BarChart3,       roles: ['director', 'sales_director'] },
+  { href: '/dashboard/followups',  label: 'Follow-ups',  icon: Bell,            roles: ['director', 'sales_director', 'vp', 'accounts', 'sales'] },
   { href: '/dashboard/accounts',   label: 'Accounts',    icon: CreditCard,      roles: ['director', 'accounts'] },
-  { href: '/dashboard/workload',   label: 'Workload',    icon: Users,           roles: ['director'] },
-  { href: '/dashboard/settings',   label: 'Settings',    icon: Settings,        roles: ['director', 'vp', 'accounts', 'sales', 'manufacturing', 'design'] },
+  { href: '/dashboard/workload',   label: 'Workload',    icon: Users,           roles: ['director', 'sales_director'] },
+  { href: '/dashboard/settings',   label: 'Settings',    icon: Settings,        roles: ['director', 'sales_director', 'vp', 'accounts', 'sales', 'manufacturing', 'design'] },
 ]
 
 interface NotifTask {

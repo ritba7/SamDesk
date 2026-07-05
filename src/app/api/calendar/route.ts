@@ -17,6 +17,8 @@ interface CalEvent {
 
 function roleSees(visibility: string[], userRole: string): boolean {
   if (userRole === 'director') return true
+  // Sales director sees everything the sales team sees
+  if (userRole === 'sales_director') return visibility.includes('sales') || visibility.includes('sales_director')
   return visibility.includes(userRole)
 }
 
@@ -30,7 +32,8 @@ export async function GET(req: NextRequest) {
 
   // Tasks
   const taskWhere: any = { dueDate: { not: null } }
-  if (role !== 'director') taskWhere.assignedToId = user.id
+  if (role === 'sales_director') taskWhere.assignedTo = { role: { in: ['sales', 'sales_director'] } }
+  else if (role !== 'director') taskWhere.assignedToId = user.id
   const tasks = await prisma.task.findMany({
     where: taskWhere,
     include: { deal: { select: { customerCompany: true } } },
@@ -84,16 +87,32 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Deal-based deadlines / dispatch
+  // Deal-based deadlines / dispatch. Sales only see their own deals.
+  const dealWhere: any = {}
+  if (role === 'sales') dealWhere.OR = [{ assignedToId: user.id }, { createdById: user.id }]
   const deals = await prisma.deal.findMany({
+    where: dealWhere,
     select: {
       id: true, customerCompany: true,
       advanceDeadline: true, advanceReceived: true, advanceAmount: true,
       balanceDeadline: true, balancePaid: true,
       tdsDeadline: true, expectedDispatch: true,
+      nextFollowUpAt: true, nextFollowUpMode: true,
+      assignedToId: true, createdById: true,
     },
   })
+  const now = new Date()
   for (const d of deals) {
+    // Next follow-up events: visible to the assigned salesman + directors
+    if (d.nextFollowUpAt && d.nextFollowUpAt >= now) {
+      const isOwn = d.assignedToId === user.id || d.createdById === user.id
+      if (['director', 'sales_director'].includes(role) || (role === 'sales' && isOwn) || (role !== 'sales' && roleSees(['sales', 'vp'], role) && isOwn)) {
+        events.push({
+          id: `followup-${d.id}`, date: d.nextFollowUpAt.toISOString(), type: 'task',
+          title: `Follow-up (${d.nextFollowUpMode === 'mail' ? 'Email' : 'Call'}) — ${d.customerCompany}`, dealId: d.id,
+        })
+      }
+    }
     if (d.advanceDeadline && !d.advanceReceived && roleSees(['accounts', 'sales'], role)) {
       events.push({
         id: `adv-${d.id}`, date: d.advanceDeadline.toISOString(), type: 'deadline',

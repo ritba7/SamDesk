@@ -22,7 +22,8 @@ export default function EditDealPage() {
   const [saveMsg, setSaveMsg] = useState('')
 
   const user = session?.user as any
-  const canEdit = ['director', 'vp', 'accounts'].includes(user?.role)
+  const canEdit = ['director', 'vp', 'accounts', 'sales', 'sales_director'].includes(user?.role)
+    && !(deal?.dealFinalized && user?.role === 'sales')
 
   useEffect(() => {
     Promise.all([

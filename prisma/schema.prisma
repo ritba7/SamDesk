@@ -147,6 +147,15 @@ model Deal {
   inspectionType  String?  // physical, waiver
   installationDone Boolean @default(false)
 
+  // Phase 1+2 additions
+  serialNumber   String?  // e.g. AS-ABCP-SE1_050726_02
+  dealFinalized  Boolean  @default(false)  // specs+commercials frozen
+  productOther   String?  // manual product name when productInterest = 'other'
+  flooringType   String?  // ss_sheet, ms_pvc, grated, shoe_sole_cleaner, without, antistatic
+  doorLeaf       String?  // single, double, without
+  nextFollowUpAt DateTime?
+  nextFollowUpMode String? // call, mail
+
   assignedToId    String?
   createdById     String
 
@@ -155,6 +164,7 @@ model Deal {
 
   activities      Activity[]
   tasks           Task[]
+  contacts        ContactPerson[]
   documents       Document[]
   productionStages ProductionStage[]
   quotes          Quote[]
@@ -198,8 +208,21 @@ model Activity {
   type      String   // stage_change, note, call, document, payment, task
   content   String
   metadata  String?  // JSON string
+  highlighted Boolean @default(false)
   deal      Deal?    @relation(fields: [dealId], references: [id])
   user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model ContactPerson {
+  id        String  @id @default(cuid())
+  dealId    String
+  name      String
+  phone     String?
+  email     String?
+  designation String?
+  isPrimary Boolean @default(false)
+  deal      Deal    @relation(fields: [dealId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
 }
 

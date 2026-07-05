@@ -205,11 +205,24 @@ export const ENTRY_TYPES = [
 export const AIR_FLOW_TIMES = ['10', '15', '20', '30', '40', '60']
 export const DOOR_TYPES = [
   { key: 'hinged', label: 'Hinged' },
-  { key: 'sliding', label: 'Sliding' },
-  { key: 'rollup', label: 'Roll-up' },
-  { key: 'shutter', label: 'Shutter' },
+  { key: 'manual_slide', label: 'Manual Slide' },
+  { key: 'automatic_slide', label: 'Automatic Slide' },
+  { key: 'high_speed', label: 'High Speed' },
   { key: 'pvc', label: 'PVC Strip Curtain' },
   { key: 'air_curtain', label: 'Air Curtain' },
+]
+export const DOOR_LEAVES = [
+  { key: 'single', label: 'Single Leaf' },
+  { key: 'double', label: 'Double Leaf' },
+  { key: 'without', label: 'Without Door' },
+]
+export const FLOORING_TYPES = [
+  { key: 'ss_sheet', label: 'SS Sheet Flooring' },
+  { key: 'ms_pvc', label: 'MS Sheet + PVC' },
+  { key: 'grated', label: 'Grated Flooring' },
+  { key: 'shoe_sole_cleaner', label: 'Shoe Sole Cleaner' },
+  { key: 'without', label: 'Without Flooring' },
+  { key: 'antistatic', label: 'Antistatic Flooring' },
 ]
 export const MOTOR_TYPES = [
   { key: 'ie2', label: 'IE2 (High Efficiency)' },

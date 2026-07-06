@@ -30,6 +30,11 @@ export const STAGES = [
   { id: 'closed_lost', label: 'Closed Lost', color: 'bg-red-100 text-red-800' },
 ]
 
+// Pipeline split: a "lead" becomes an "active deal" once a PO is received.
+export const LEAD_STAGES = ['inquiry', 'tds_sent', 'quote_sent', 'follow_up']
+export const ACTIVE_STAGES = ['po_received', 'po_vetted', 'pi_sent', 'approval_pending', 'production', 'dispatch_ready', 'dispatched', 'feedback_pending']
+export const CLOSED_STAGES = ['closed_won', 'closed_lost']
+
 // Estimated days are defaults — actual duration depends on load
 export const PRODUCTION_STAGES = [
   { key: 'sheet_designing', label: 'Sheet Designing', estimatedDays: 1 },

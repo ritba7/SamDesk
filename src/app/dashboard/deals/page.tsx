@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { Plus, Search, Flame, Thermometer, Snowflake, User, Calendar, DollarSign, ChevronDown, ChevronUp } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { formatCurrency, formatDate, getStageColor, getStageLabel, STAGES } from '@/lib/utils'
+import { formatCurrency, formatDate, getStageColor, getStageLabel, STAGES, LEAD_STAGES, ACTIVE_STAGES } from '@/lib/utils'
 
 const CLOSED_STAGES = ['closed_won', 'closed_lost', 'completed', 'installation']
 
@@ -87,6 +87,7 @@ export default function DealsPage() {
   const [stageFilter, setStageFilter] = useState('')
   const [heatFilter, setHeatFilter] = useState('')
   const [showClosed, setShowClosed] = useState(false)
+  const [tab, setTab] = useState<'leads' | 'active'>('leads')
   const user = session?.user as any
 
   useEffect(() => {
@@ -99,16 +100,30 @@ export default function DealsPage() {
     return matchSearch && (!stageFilter || d.stage === stageFilter) && (!heatFilter || d.heatScore === heatFilter)
   })
 
-  const activeDeals = filtered.filter(d => !CLOSED_STAGES.includes(d.stage))
+  const leadsList = filtered.filter(d => LEAD_STAGES.includes(d.stage))
+  const activeList = filtered.filter(d => ACTIVE_STAGES.includes(d.stage))
   const closedDeals = filtered.filter(d => CLOSED_STAGES.includes(d.stage))
+  const shownDeals = tab === 'leads' ? leadsList : activeList
 
   const canCreate = ['director', 'sales_director', 'vp', 'accounts', 'sales'].includes(user?.role)
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div><h1 className="text-2xl font-bold text-gray-900">Leads</h1><p className="text-gray-500 mt-1">{filtered.length} leads</p></div>
+        <div><h1 className="text-2xl font-bold text-gray-900">Pipeline</h1><p className="text-gray-500 mt-1">Leads convert to Active Deals when a PO is received</p></div>
         {canCreate && <Link href="/dashboard/deals/new"><Button><Plus className="w-4 h-4" />New Deal</Button></Link>}
+      </div>
+
+      {/* Leads / Active Deals tabs */}
+      <div className="flex gap-2 border-b border-gray-200">
+        <button onClick={() => setTab('leads')}
+          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${tab === 'leads' ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+          Leads ({leadsList.length})
+        </button>
+        <button onClick={() => setTab('active')}
+          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${tab === 'active' ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+          Active Deals ({activeList.length})
+        </button>
       </div>
       <div className="flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-48">
@@ -125,16 +140,14 @@ export default function DealsPage() {
         </select>
         {(stageFilter || heatFilter || search) && <Button variant="ghost" size="sm" onClick={() => { setSearch(''); setStageFilter(''); setHeatFilter('') }}>Clear</Button>}
       </div>
-      {loading ? <div className="text-center py-12 text-gray-400">Loading deals...</div> :
-        filtered.length === 0 ? <div className="text-center py-12"><p className="text-gray-400 mb-4">No deals found</p>{canCreate && <Link href="/dashboard/deals/new"><Button><Plus className="w-4 h-4" /> Create first deal</Button></Link>}</div> : (
+      {loading ? <div className="text-center py-12 text-gray-400">Loading deals...</div> : (
         <div className="space-y-6">
           <div>
-            <h2 className="text-sm font-semibold text-gray-600 mb-3">Active Pipeline — {activeDeals.length} deal{activeDeals.length !== 1 ? 's' : ''}</h2>
-            {activeDeals.length === 0 ? (
-              <p className="text-gray-400 text-sm">No active deals</p>
+            {shownDeals.length === 0 ? (
+              <p className="text-gray-400 text-sm text-center py-8">{tab === 'leads' ? 'No leads in the pipeline' : 'No active deals yet — leads appear here once a PO is received'}</p>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                {activeDeals.map(deal => <DealCard key={deal.id} deal={deal} role={user?.role} />)}
+                {shownDeals.map(deal => <DealCard key={deal.id} deal={deal} role={user?.role} />)}
               </div>
             )}
           </div>

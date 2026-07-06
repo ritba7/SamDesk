@@ -224,6 +224,7 @@ model WorkOrder {
   piId          String?  @unique
   woNumber      String   @unique  // SPWO/{model}/{MMYY}/{serial}
   specSnapshot  String?  // JSON snapshot of specs at generation time
+  filledData    String?  // JSON of the detailed WO tickbox form (production + accounts)
   status        String   @default("pending_approval") // pending_approval, approved, in_production, completed
   approvedByAccounts Boolean @default(false)
   approvedByAccountsAt DateTime?

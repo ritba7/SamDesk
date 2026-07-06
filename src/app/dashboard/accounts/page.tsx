@@ -406,6 +406,60 @@ function VettingQueue({ onChanged }: { onChanged: () => void }) {
   )
 }
 
+// Material Orders card — pending material requests raised from production
+function MaterialOrders() {
+  const [requests, setRequests] = useState<any[]>([])
+  const [acting, setActing] = useState<string | null>(null)
+
+  const load = () => fetch('/api/material-requests').then(r => r.ok ? r.json() : []).then(d => setRequests(Array.isArray(d) ? d : [])).catch(() => {})
+  useEffect(() => { load() }, [])
+
+  const setStatus = async (id: string, status: string) => {
+    setActing(id + status)
+    await fetch('/api/material-requests', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status }) })
+    setActing(null); load()
+  }
+
+  const pending = requests.filter(r => r.status !== 'received')
+  if (pending.length === 0) return null
+
+  return (
+    <Card className="border-indigo-200">
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          <FileText className="w-4 h-4 text-indigo-600" /> Material Orders
+          <span className="ml-auto text-xs font-normal bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full">{pending.length}</span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {pending.map(r => (
+          <div key={r.id} className="rounded-lg border border-gray-200 bg-white p-3">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <Link href={`/dashboard/deals/${r.dealId}`} className="text-sm font-medium text-gray-900 hover:text-blue-600 font-mono">{r.woNumber || r.deal?.workCode || r.deal?.serialNumber || r.deal?.dealNumber}</Link>
+                <p className="text-xs text-gray-500">{r.deal?.customerCompany} · {formatDate(r.createdAt)}</p>
+              </div>
+              <span className={`text-xs px-2 py-0.5 rounded-full capitalize ${r.status === 'ordered' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>{r.status}</span>
+            </div>
+            <table className="w-full text-xs mb-2">
+              <tbody>
+                {(r.items || []).map((it: any, i: number) => (
+                  <tr key={i}><td className="py-0.5 pr-3 font-medium text-gray-800">{it.item}</td><td className="py-0.5 pr-3 text-gray-500">{it.spec}</td><td className="py-0.5 text-gray-500">× {it.qty}</td></tr>
+                ))}
+              </tbody>
+            </table>
+            {r.notes && <p className="text-xs text-gray-400 mb-2">{r.notes}</p>}
+            <div className="flex gap-2">
+              {r.status === 'pending' && <Button size="sm" variant="outline" onClick={() => setStatus(r.id, 'ordered')} disabled={acting === r.id + 'ordered'}>Mark Ordered</Button>}
+              <Button size="sm" variant="outline" onClick={() => setStatus(r.id, 'received')} disabled={acting === r.id + 'received'}>Mark Received</Button>
+            </div>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  )
+}
+
 export default function AccountsPage() {
   const { data: session } = useSession()
   const [deals, setDeals] = useState<any[]>([])
@@ -601,6 +655,9 @@ export default function AccountsPage() {
 
       {/* Vetting Queue */}
       <VettingQueue onChanged={loadData} />
+
+      {/* Material Orders */}
+      <MaterialOrders />
 
       {/* Money Due Schedule */}
       <Card>

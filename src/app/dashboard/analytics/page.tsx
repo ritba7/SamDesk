@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatCurrency, STAGES } from '@/lib/utils'
-import { TrendingUp, DollarSign, Activity, AlertTriangle } from 'lucide-react'
+import { TrendingUp, DollarSign, Activity, AlertTriangle, Download } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 
 const COLORS = ['#2563eb', '#16a34a', '#dc2626', '#d97706', '#7c3aed', '#0891b2', '#db2777']
 
@@ -31,7 +32,14 @@ export default function AnalyticsPage() {
 
   return (
     <div className="space-y-6">
-      <div><h1 className="text-2xl font-bold text-gray-900">Analytics</h1><p className="text-gray-500 mt-1">Business performance overview</p></div>
+      <div className="flex items-start justify-between">
+        <div><h1 className="text-2xl font-bold text-gray-900">Analytics</h1><p className="text-gray-500 mt-1">Business performance overview</p></div>
+        {user?.role === 'director' && (
+          <Button variant="outline" size="sm" onClick={() => window.open('/api/export/all')}>
+            <Download className="w-4 h-4 mr-2" /> Download Full Data Export
+          </Button>
+        )}
+      </div>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card><CardContent className="p-5"><div className="flex items-start justify-between"><div><p className="text-sm text-gray-500">Total Deals</p><p className="text-3xl font-bold text-gray-900 mt-1">{analytics.total}</p><p className="text-xs text-gray-400 mt-1">{analytics.active} active</p></div><div className="p-2.5 rounded-lg bg-blue-50"><Activity className="w-5 h-5 text-blue-600" /></div></div></CardContent></Card>
         <Card><CardContent className="p-5"><div className="flex items-start justify-between"><div><p className="text-sm text-gray-500">Conversion Rate</p><p className="text-3xl font-bold text-gray-900 mt-1">{analytics.conversionRate}%</p><p className="text-xs text-gray-400 mt-1">{analytics.won} won · {analytics.lost} lost</p></div><div className="p-2.5 rounded-lg bg-green-50"><TrendingUp className="w-5 h-5 text-green-600" /></div></div></CardContent></Card>

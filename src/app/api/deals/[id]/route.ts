@@ -74,6 +74,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     'basicPrice', 'discountType', 'discountValue', 'finalPrice',
     'freightBearer', 'freightAmount', 'assemblyAtSite', 'assemblyCharge',
     'warrantyTerms', 'insuranceNote', 'commercialsDone', 'paymentTerms',
+    // Dispatch chain fields (primary path is /api/dispatch, but allow direct PATCH)
+    'dispatchStatus', 'dispatchDate', 'packingListNote',
   ]
 
   // Sales cannot overwrite fields that already hold a value — only fill blanks
@@ -188,9 +190,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (newStage === 'production') {
       const existingStages = await prisma.productionStage.count({ where: { dealId: deal.id } })
       if (existingStages === 0) {
+        const mat = (deal.material || '').toLowerCase()
+        const isMs = mat === 'ms' || mat.includes('ms_') || mat.includes('ms')
+        const applicableStages = PRODUCTION_STAGES.filter(ps => {
+          if (ps.key === 'powder_coating' || ps.key === 'assembly_2') return isMs
+          if (ps.key === 'external_inspection') return deal.inspectionTerms !== 'waiver'
+          return true
+        })
         let currentDate = new Date()
-        for (let i = 0; i < PRODUCTION_STAGES.length; i++) {
-          const ps = PRODUCTION_STAGES[i]
+        for (let i = 0; i < applicableStages.length; i++) {
+          const ps = applicableStages[i]
           const plannedStart = new Date(currentDate)
           const plannedEnd = addBusinessDays(currentDate, ps.estimatedDays)
           await prisma.productionStage.create({

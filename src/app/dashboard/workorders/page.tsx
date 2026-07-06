@@ -88,7 +88,7 @@ export default function WorkOrdersPage() {
                     return (
                       <tr key={wo.id} className="hover:bg-gray-50">
                         <td className="py-3 font-mono text-xs font-semibold text-gray-900">
-                          <Link href={`/dashboard/deals/${wo.dealId}`} className="hover:text-blue-600">{wo.woNumber}</Link>
+                          <Link href={`/dashboard/workorders/${wo.id}`} className="hover:text-blue-600">{wo.woNumber}</Link>
                         </td>
                         {!isMfg && (
                           <td className="py-3 font-mono text-xs text-gray-500">{wo.deal?.workCode || wo.deal?.serialNumber || '—'}</td>

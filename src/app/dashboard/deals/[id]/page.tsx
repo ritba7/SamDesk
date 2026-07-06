@@ -9,7 +9,7 @@ import {
   Activity, DollarSign, Factory, Calendar,
   MessageSquare, AlertCircle, Check, Download,
   Shield, Phone, Mail as MailIcon, Pencil, Copy, TrendingUp, Edit, Star, Lock,
-  IndianRupee, ShieldCheck, Send, ClipboardList
+  IndianRupee, ShieldCheck, Send, ClipboardList, Package, Truck, X, ChevronDown, ChevronUp
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -25,6 +25,308 @@ function HeatBadge({ score }: { score: string }) {
   if (score === 'hot') return <span className="flex items-center gap-1 text-xs text-red-600 bg-red-50 px-2 py-0.5 rounded-full"><Flame className="w-3 h-3" /> Hot</span>
   if (score === 'warm') return <span className="flex items-center gap-1 text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full"><Thermometer className="w-3 h-3" /> Warm</span>
   return <span className="flex items-center gap-1 text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full"><Snowflake className="w-3 h-3" /> Cold</span>
+}
+
+const MR_STATUS: Record<string, string> = {
+  pending: 'bg-amber-100 text-amber-700',
+  ordered: 'bg-blue-100 text-blue-700',
+  received: 'bg-green-100 text-green-700',
+}
+
+function MaterialRequestsSection({ deal, role }: { deal: any, role: string }) {
+  const canRequest = ['manufacturing', 'director', 'vp'].includes(role)
+  const [requests, setRequests] = useState<any[]>([])
+  const [modal, setModal] = useState(false)
+  const [rows, setRows] = useState<any[]>([
+    { item: 'Glass', spec: '', qty: '' },
+    { item: 'Wooden Palette', spec: '', qty: '' },
+  ])
+  const [notes, setNotes] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const load = () => fetch(`/api/material-requests?dealId=${deal.id}`).then(r => r.ok ? r.json() : []).then(d => setRequests(Array.isArray(d) ? d : [])).catch(() => {})
+  useEffect(() => { load() }, [deal.id])
+
+  const assembly1 = deal.productionStages?.find((s: any) => s.stageName === 'assembly_1')
+  const showRequest = canRequest && (!assembly1 || assembly1.status !== 'completed')
+
+  const submit = async () => {
+    setSaving(true)
+    await fetch('/api/material-requests', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dealId: deal.id, items: rows.filter(r => r.item || r.spec || r.qty), notes }),
+    })
+    setSaving(false); setModal(false)
+    setRows([{ item: 'Glass', spec: '', qty: '' }, { item: 'Wooden Palette', spec: '', qty: '' }])
+    setNotes('')
+    load()
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm flex items-center gap-2"><Package className="w-4 h-4 text-indigo-600" /> Material Requests</CardTitle>
+          {showRequest && <Button size="sm" variant="outline" onClick={() => setModal(true)}><Plus className="w-3.5 h-3.5 mr-1" /> Request Materials</Button>}
+        </div>
+      </CardHeader>
+      <CardContent>
+        {requests.length === 0 ? (
+          <p className="text-sm text-gray-400">No material requests yet.</p>
+        ) : (
+          <div className="space-y-2">
+            {requests.map(r => (
+              <div key={r.id} className="rounded-lg border border-gray-200 p-3">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs text-gray-500">{formatDate(r.createdAt)}{r.woNumber ? ` · ${r.woNumber}` : ''}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full capitalize ${MR_STATUS[r.status] || 'bg-gray-100 text-gray-600'}`}>{r.status}</span>
+                </div>
+                <table className="w-full text-xs">
+                  <tbody>
+                    {(r.items || []).map((it: any, i: number) => (
+                      <tr key={i}><td className="py-0.5 pr-2 font-medium text-gray-800">{it.item}</td><td className="py-0.5 pr-2 text-gray-500">{it.spec}</td><td className="py-0.5 text-gray-500">× {it.qty}</td></tr>
+                    ))}
+                  </tbody>
+                </table>
+                {r.notes && <p className="text-xs text-gray-400 mt-1">{r.notes}</p>}
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+
+      {modal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-auto">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h2 className="font-semibold text-gray-900">Request Materials</h2>
+              <button onClick={() => setModal(false)}><X className="w-5 h-5 text-gray-400" /></button>
+            </div>
+            <div className="p-4 space-y-3">
+              <div className="grid grid-cols-[1fr_1fr_70px_28px] gap-2 text-xs font-medium text-gray-500">
+                <span>Item</span><span>Spec / Size</span><span>Qty</span><span></span>
+              </div>
+              {rows.map((row, i) => (
+                <div key={i} className="grid grid-cols-[1fr_1fr_70px_28px] gap-2 items-center">
+                  <input value={row.item} onChange={e => setRows(rs => rs.map((r, j) => j === i ? { ...r, item: e.target.value } : r))} className="h-8 px-2 text-xs border border-gray-300 rounded" placeholder="Item" />
+                  <input value={row.spec} onChange={e => setRows(rs => rs.map((r, j) => j === i ? { ...r, spec: e.target.value } : r))} className="h-8 px-2 text-xs border border-gray-300 rounded" placeholder="Size / spec" />
+                  <input value={row.qty} onChange={e => setRows(rs => rs.map((r, j) => j === i ? { ...r, qty: e.target.value } : r))} className="h-8 px-2 text-xs border border-gray-300 rounded" placeholder="Qty" />
+                  <button onClick={() => setRows(rs => rs.filter((_, j) => j !== i))} className="text-gray-300 hover:text-red-500"><X className="w-4 h-4" /></button>
+                </div>
+              ))}
+              <button onClick={() => setRows(rs => [...rs, { item: '', spec: '', qty: '' }])} className="text-xs text-blue-600 hover:underline flex items-center gap-1"><Plus className="w-3 h-3" /> Add item</button>
+              <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Notes (optional)" className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md" />
+            </div>
+            <div className="flex gap-2 justify-end p-4 border-t">
+              <Button variant="outline" onClick={() => setModal(false)}>Cancel</Button>
+              <Button onClick={submit} disabled={saving}>{saving ? 'Submitting…' : 'Submit Request'}</Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </Card>
+  )
+}
+
+const INSP_TEXT_FIELDS: { key: string, label: string }[] = [
+  { key: 'glassSize1', label: 'Glass Size 1' }, { key: 'glassSize2', label: 'Glass Size 2' },
+  { key: 'glassSize3', label: 'Glass Size 3' }, { key: 'glassSize4', label: 'Glass Size 4' },
+  { key: 'motorSerialNo', label: 'Motor Serial No' }, { key: 'motorMake', label: 'Motor Make' },
+  { key: 'electricalPanelSerialNo', label: 'Electrical Panel Serial No' }, { key: 'hepaSize', label: 'HEPA Size' },
+  { key: 'preFilterSize', label: 'Pre-Filter Size' }, { key: 'doorSize', label: 'Door Size' },
+  { key: 'ledWattage', label: 'LED Wattage' }, { key: 'ledQty', label: 'LED Qty' },
+  { key: 'inputPower', label: 'Input Power' },
+]
+const INSP_ENTRY_CONTROL = ['NTS', 'Motion Sensor', 'Nothing', 'Biometric', 'Numeric Lock', 'Beam Sensor']
+const INSP_EXTRAS = ['Air Curtain', 'Strip Curtain']
+const INSP_QUALITY = ['Air flow OK', 'Door interlock OK', 'Emergency switch OK', 'Nozzles aligned', 'LED working', 'Panel labelled', 'No sharp edges / finish OK', 'Filters seated properly']
+
+function InspectionSection({ deal, role }: { deal: any, role: string }) {
+  const canEdit = ['manufacturing', 'vp', 'director'].includes(role)
+  const [open, setOpen] = useState(false)
+  const [checklist, setChecklist] = useState<any>(null)
+  const [data, setData] = useState<any>({})
+  const [saving, setSaving] = useState(false)
+  const [acting, setActing] = useState(false)
+
+  const load = () => fetch(`/api/inspection?dealId=${deal.id}`).then(r => r.ok ? r.json() : null).then(d => {
+    setChecklist(d)
+    setData(d?.data || {})
+  }).catch(() => {})
+  useEffect(() => { if (open && checklist === null) load() }, [open])
+
+  if (!canEdit) return null
+
+  const set = (k: string, v: any) => setData((d: any) => ({ ...d, [k]: v }))
+
+  const save = async () => {
+    setSaving(true)
+    await fetch('/api/inspection', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dealId: deal.id, data }) })
+    setSaving(false); load()
+  }
+  const approve = async (action: string) => {
+    setActing(true)
+    await fetch('/api/inspection', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dealId: deal.id, action }) })
+    setActing(false); load()
+  }
+
+  const extras: string[] = Array.isArray(data.extras) ? data.extras : []
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <button onClick={() => setOpen(o => !o)} className="flex items-center justify-between w-full">
+          <CardTitle className="text-sm flex items-center gap-2"><ClipboardList className="w-4 h-4 text-teal-600" /> Internal Inspection Checklist
+            {checklist?.mfgApproved && <span className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-full">MFG ✓</span>}
+            {checklist?.vpApproved && <span className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-full">VP ✓</span>}
+          </CardTitle>
+          {open ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+        </button>
+      </CardHeader>
+      {open && (
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {INSP_TEXT_FIELDS.map(f => (
+              <div key={f.key}>
+                <label className="block text-xs font-medium text-gray-600 mb-1">{f.label}</label>
+                <input value={data[f.key] ?? ''} onChange={e => set(f.key, e.target.value)} className="w-full h-8 px-2 text-xs border border-gray-300 rounded" />
+              </div>
+            ))}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">EM Lock (lb)</label>
+              <div className="flex gap-1.5">
+                {['300', '600'].map(o => (
+                  <button key={o} type="button" onClick={() => set('emLockLb', data.emLockLb === o ? '' : o)} className={`px-2.5 py-1 rounded-full text-xs border ${data.emLockLb === o ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300'}`}>{o}</button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Entry Door Control</label>
+              <div className="flex flex-wrap gap-1.5">
+                {INSP_ENTRY_CONTROL.map(o => (
+                  <button key={o} type="button" onClick={() => set('entryDoorControl', data.entryDoorControl === o ? '' : o)} className={`px-2.5 py-1 rounded-full text-xs border ${data.entryDoorControl === o ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300'}`}>{o}</button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Extras</label>
+              <div className="flex flex-wrap gap-1.5">
+                {INSP_EXTRAS.map(o => {
+                  const active = extras.includes(o)
+                  return <button key={o} type="button" onClick={() => set('extras', active ? extras.filter(x => x !== o) : [...extras, o])} className={`px-2.5 py-1 rounded-full text-xs border ${active ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-600 border-gray-300'}`}>{active ? '✓ ' : ''}{o}</button>
+                })}
+              </div>
+            </div>
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Quality Checks</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {INSP_QUALITY.map(q => (
+                <label key={q} className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input type="checkbox" checked={!!data[q]} onChange={e => set(q, e.target.checked)} className="w-4 h-4 rounded text-blue-600" />
+                  <span className={data[q] ? 'text-gray-700' : 'text-gray-500'}>{q}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2 items-center border-t pt-3">
+            <Button size="sm" onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save Checklist'}</Button>
+            {['manufacturing', 'director'].includes(role) && (
+              <Button size="sm" variant="outline" onClick={() => approve('approve_mfg')} disabled={acting || checklist?.mfgApproved}>
+                {checklist?.mfgApproved ? 'MFG Approved ✓' : 'Approve as MFG'}
+              </Button>
+            )}
+            {['vp', 'director'].includes(role) && (
+              <Button size="sm" variant="outline" onClick={() => approve('approve_vp')} disabled={acting || checklist?.vpApproved}>
+                {checklist?.vpApproved ? 'VP Approved ✓' : 'Approve as VP'}
+              </Button>
+            )}
+            {checklist?.mfgApprovedAt && <span className="text-xs text-gray-400">MFG: {formatDate(checklist.mfgApprovedAt)}</span>}
+            {checklist?.vpApprovedAt && <span className="text-xs text-gray-400">VP: {formatDate(checklist.vpApprovedAt)}</span>}
+          </div>
+        </CardContent>
+      )}
+    </Card>
+  )
+}
+
+const DISPATCH_STEPS: { status: string, label: string, roles: string[] }[] = [
+  { status: 'payment_received', label: 'Payment Received', roles: ['accounts', 'director'] },
+  { status: 'truck_arranged', label: 'Truck Arranged', roles: ['accounts', 'director'] },
+  { status: 'forklift_called', label: 'Forklift Called', roles: ['accounts', 'director'] },
+  { status: 'loaded', label: 'Loaded (packing list)', roles: ['manufacturing', 'director'] },
+  { status: 'tarp_verified', label: 'Tarpaulin Verified', roles: ['accounts', 'director'] },
+  { status: 'dispatched', label: 'Dispatched', roles: ['accounts', 'director'] },
+  { status: 'unloaded', label: 'Unloaded at Customer', roles: ['sales', 'sales_director', 'director'] },
+  { status: 'assembly_planned', label: 'Assembly Planned', roles: ['accounts', 'director'] },
+  { status: 'closed', label: 'Closed', roles: ['accounts', 'director'] },
+]
+
+function DispatchSection({ deal, role, onChanged }: { deal: any, role: string, onChanged: () => void }) {
+  const [busy, setBusy] = useState(false)
+  const [dispatchDate, setDispatchDate] = useState('')
+  const [packingNote, setPackingNote] = useState(deal.packingListNote || '')
+
+  const currentIdx = deal.dispatchStatus ? DISPATCH_STEPS.findIndex(s => s.status === deal.dispatchStatus) : -1
+
+  const act = async (status: string, extra: any = {}) => {
+    setBusy(true)
+    const res = await fetch('/api/dispatch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dealId: deal.id, nextStatus: status, ...extra }),
+    })
+    setBusy(false)
+    if (!res.ok) { const e = await res.json().catch(() => ({})); alert(e.error || 'Failed') }
+    onChanged()
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-sm flex items-center gap-2"><Truck className="w-4 h-4 text-blue-600" /> Dispatch
+          {deal.dispatchDate && <span className="text-xs text-gray-500 font-normal">· Dispatch date: {formatDate(deal.dispatchDate)}</span>}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          {DISPATCH_STEPS.map((step, idx) => {
+            const done = idx <= currentIdx
+            const isNext = idx === currentIdx + 1
+            const roleAllowed = step.roles.includes(role)
+            return (
+              <div key={step.status} className={`flex items-start gap-3 p-2.5 rounded-lg border ${done ? 'border-green-200 bg-green-50' : isNext ? 'border-blue-200 bg-blue-50' : 'border-gray-200 bg-white'}`}>
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${done ? 'bg-green-500' : isNext ? 'bg-blue-500' : 'bg-gray-200'}`}>
+                  {done ? <Check className="w-3 h-3 text-white" /> : <span className="text-[10px] text-white font-bold">{idx + 1}</span>}
+                </div>
+                <div className="flex-1">
+                  <p className={`text-sm ${done ? 'text-green-700 font-medium' : isNext ? 'text-blue-700 font-medium' : 'text-gray-500'}`}>{step.label}</p>
+                  {isNext && roleAllowed && (
+                    <div className="mt-2 space-y-2">
+                      {step.status === 'loaded' && (
+                        <textarea value={packingNote} onChange={e => setPackingNote(e.target.value)} rows={2} placeholder="Packing list note" className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded" />
+                      )}
+                      {step.status === 'payment_received' && (
+                        <input type="date" value={dispatchDate} onChange={e => setDispatchDate(e.target.value)} className="h-8 px-2 text-xs border border-gray-300 rounded" />
+                      )}
+                      <Button size="sm" disabled={busy} onClick={() => act(step.status,
+                        step.status === 'loaded' ? { packingListNote: packingNote } :
+                        step.status === 'payment_received' && dispatchDate ? { dispatchDate } : {}
+                      )}>
+                        {busy ? 'Working…' : `Mark ${step.label}`}
+                      </Button>
+                    </div>
+                  )}
+                  {isNext && !roleAllowed && <p className="text-xs text-gray-400 mt-1">Awaiting {step.roles.join(' / ')}</p>}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  )
 }
 
 export default function DealDetailPage() {
@@ -763,6 +1065,16 @@ export default function DealDetailPage() {
                 </div>
               )
             })}</div>
+          )}
+
+          {deal.productionStages.length > 0 && (
+            <div className="mt-6 space-y-4">
+              <MaterialRequestsSection deal={deal} role={role} />
+              <InspectionSection deal={deal} role={role} />
+              {deal.vettingStatus === 'approved' && ['accounts', 'director', 'vp', 'manufacturing', 'sales', 'sales_director'].includes(role) && (
+                <DispatchSection deal={deal} role={role} onChanged={fetchDeal} />
+              )}
+            </div>
           )}
         </TabsContent>
 

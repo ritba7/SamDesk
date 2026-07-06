@@ -177,6 +177,11 @@ model Deal {
   workCode          String?   @unique  // unique code assigned by accounts on approval
   quoteVetStatus    String    @default("none") // none, requested, vetted
 
+  // Dispatch chain (Phase 4)
+  dispatchStatus  String?  // payment_pending, payment_received, truck_arranged, forklift_called, loaded, tarp_verified, dispatched, unloaded, assembly_planned, closed
+  dispatchDate    DateTime?
+  packingListNote String?
+
   assignedToId    String?
   createdById     String
 
@@ -192,6 +197,8 @@ model Deal {
   payments        Payment[]
   proformaInvoices ProformaInvoice[]
   workOrders      WorkOrder[]
+  materialRequests MaterialRequest[]
+  inspection      InspectionChecklist?
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -226,6 +233,32 @@ model WorkOrder {
   deal          Deal     @relation(fields: [dealId], references: [id])
   pi            ProformaInvoice? @relation(fields: [piId], references: [id])
   createdAt     DateTime @default(now())
+}
+
+model MaterialRequest {
+  id        String   @id @default(cuid())
+  dealId    String
+  woNumber  String?
+  items     String   // JSON array [{item, spec, qty}]
+  status    String   @default("pending") // pending, ordered, received
+  notes     String?
+  createdById String?
+  deal      Deal     @relation(fields: [dealId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model InspectionChecklist {
+  id        String   @id @default(cuid())
+  dealId    String   @unique
+  data      String   // JSON of all checklist fields
+  mfgApproved  Boolean @default(false)
+  mfgApprovedAt DateTime?
+  vpApproved   Boolean @default(false)
+  vpApprovedAt DateTime?
+  deal      Deal     @relation(fields: [dealId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Quote {

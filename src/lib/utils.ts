@@ -30,18 +30,19 @@ export const STAGES = [
   { id: 'closed_lost', label: 'Closed Lost', color: 'bg-red-100 text-red-800' },
 ]
 
+// Estimated days are defaults — actual duration depends on load
 export const PRODUCTION_STAGES = [
-  { key: 'base_plate', label: 'Base Plate', estimatedDays: 1 },
-  { key: 'door_laser', label: 'Door Laser Cutting', estimatedDays: 1 },
-  { key: 'sheet_bending', label: 'Sheet Bending', estimatedDays: 1 },
-  { key: 'assembly1', label: 'Assembly (Phase 1)', estimatedDays: 2 },
-  { key: 'powder_coating', label: 'Powder Coating', estimatedDays: 2 },
-  { key: 'assembly2', label: 'Assembly (Phase 2)', estimatedDays: 1 },
-  { key: 'electricals', label: 'Electricals', estimatedDays: 1 },
-  { key: 'high_speed_door', label: 'High Speed Door', estimatedDays: 1 },
-  { key: 'inspection_internal', label: 'Internal Inspection', estimatedDays: 1 },
-  { key: 'inspection_external', label: 'External Inspection', estimatedDays: 1 },
-  { key: 'dispatch', label: 'Dispatch', estimatedDays: 1 },
+  { key: 'sheet_designing', label: 'Sheet Designing', estimatedDays: 1 },
+  { key: 'sheet_cutting_bending', label: 'Sheet Cutting & Bending', estimatedDays: 1 },
+  { key: 'pipe_cutting_base_plate', label: 'Pipe Cutting & Base Plate', estimatedDays: 1 },
+  { key: 'assembly_1', label: 'Assembly 1', estimatedDays: 2 },
+  { key: 'door_making', label: 'Door Making', estimatedDays: 1 },
+  { key: 'powder_coating', label: 'Powder Coating (if required)', estimatedDays: 3, conditional: true },
+  { key: 'assembly_2', label: 'Assembly 2 (after powder coating)', estimatedDays: 2, conditional: true },
+  { key: 'glass_electricals', label: 'Glass & Electricals', estimatedDays: 1 },
+  { key: 'internal_inspection', label: 'Internal Inspection', estimatedDays: 1 },
+  { key: 'external_inspection', label: 'External Inspection (if required)', estimatedDays: 1, conditional: true },
+  { key: 'packing_dispatch', label: 'Packing & Dispatch', estimatedDays: 1 },
 ]
 
 export function getStageLabel(stageId: string) {

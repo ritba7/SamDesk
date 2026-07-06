@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 110" width="300" height="110" role="img" aria-label="SAM Products Pvt. Ltd.">
+  <g fill="#1f3f63">
+    <!-- Wordmark: Sam -->
+    <text x="8" y="62" font-family="Georgia, 'Times New Roman', serif" font-size="66" font-weight="700" letter-spacing="-2">Sam</text>
+    <!-- Sub-wordmark -->
+    <text x="12" y="88" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" letter-spacing="1">Products Pvt. Ltd.</text>
+    <!-- Wave / swoosh -->
+    <path d="M186 74 c14 -12 30 -12 44 0 c14 12 30 12 44 0 c-14 20 -34 20 -50 8 c-12 -9 -25 -9 -38 -8 z"/>
+  </g>
+</svg>

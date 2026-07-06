@@ -386,6 +386,13 @@ export default function DealDetailPage() {
   const [piSaving, setPiSaving] = useState(false)
   const [piError, setPiError] = useState('')
 
+  // Change history (director / sales_director only)
+  const [changeLogs, setChangeLogs] = useState<any[]>([])
+  // Original lead data (pre-PO) snapshot collapse
+  const [showSnapshot, setShowSnapshot] = useState(false)
+  // Manual WO generation
+  const [generatingWo, setGeneratingWo] = useState(false)
+
   const user = session?.user as any
   const role = user?.role
 
@@ -398,6 +405,21 @@ export default function DealDetailPage() {
     fetchDeal()
     fetch('/api/users').then(r => r.json()).then(u => setUsers(Array.isArray(u) ? u : []))
   }, [id])
+
+  // Change history is visible ONLY to director & sales_director — gate the fetch too
+  useEffect(() => {
+    if (role === 'director' || role === 'sales_director') {
+      fetch(`/api/changelog?dealId=${id}`).then(r => r.ok ? r.json() : []).then(d => setChangeLogs(Array.isArray(d) ? d : [])).catch(() => {})
+    }
+  }, [id, role])
+
+  const generateWorkOrder = async () => {
+    setGeneratingWo(true)
+    const res = await fetch('/api/workorders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dealId: id }) })
+    if (!res.ok) { const e = await res.json().catch(() => ({})); alert(e.error || 'Failed to generate work order') }
+    await fetchDeal()
+    setGeneratingWo(false)
+  }
 
   const changeStage = async (newStage: string) => {
     if (!deal) return; setStageLoading(true)
@@ -597,6 +619,12 @@ export default function DealDetailPage() {
   const canSubmitVetting = canCommercials && deal.commercialsDone && hasSpecs
     && ['not_submitted', 'rejected'].includes(deal.vettingStatus)
   const isAccountsOrDirector = ['accounts', 'director'].includes(role)
+  const isDealSalesman = deal.assignedToId === user?.id || deal.createdById === user?.id
+  // Who may see/enter the final PO data: the deal's salesman, sales_director, director
+  const canSeePoAudit = role === 'director' || role === 'sales_director' || (role === 'sales' && isDealSalesman)
+  const showFinalEntry = deal.stage === 'po_received' && !deal.finalDataEntered && canSeePoAudit
+  const canGenerateWo = isAccountsOrDirector && deal.vettingStatus === 'approved' && (!deal.workOrders || deal.workOrders.length === 0)
+  const canSeeChangeHistory = role === 'director' || role === 'sales_director'
   const woNumber = deal.workOrders?.[0]?.woNumber
   const pageTitle = role === 'manufacturing' ? (woNumber || deal.customerCompany) : deal.customerCompany
 
@@ -720,6 +748,68 @@ export default function DealDetailPage() {
           {deal.lostNotes && <p className="text-red-500 text-sm mt-1">{deal.lostNotes}</p>}
           {canEdit && <Button variant="outline" size="sm" className="mt-2" onClick={() => changeStage('inquiry')}>Reopen Deal</Button>}
         </div>
+      )}
+
+      {showFinalEntry && (
+        <div className="bg-amber-50 border-2 border-amber-300 rounded-lg p-4 flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <p className="text-amber-800 font-semibold text-sm">PO received — enter the confirmed final details</p>
+            <p className="text-amber-700 text-xs mt-0.5">Re-enter the deal with the exact confirmed PO data. This overwrites the earlier lead data (a pre-PO snapshot is kept for audit).</p>
+          </div>
+          <Link href={`/dashboard/deals/${id}/edit?final=1`}>
+            <Button className="bg-amber-600 hover:bg-amber-700"><Pencil className="w-3.5 h-3.5 mr-1" />Enter Final PO Details</Button>
+          </Link>
+        </div>
+      )}
+
+      {canGenerateWo && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <p className="text-blue-800 font-semibold text-sm">Generate Work Order</p>
+            <p className="text-blue-700 text-xs mt-0.5">Deal is vetted &amp; approved. A WO is normally auto-generated on PI release — you can also generate one manually now.</p>
+          </div>
+          <Button onClick={generateWorkOrder} disabled={generatingWo} className="bg-blue-600 hover:bg-blue-700">
+            <ClipboardList className="w-3.5 h-3.5 mr-1" />{generatingWo ? 'Generating…' : 'Generate WO'}
+          </Button>
+        </div>
+      )}
+
+      {deal.poSnapshot && canSeePoAudit && (
+        <Card>
+          <CardHeader className="pb-3">
+            <button onClick={() => setShowSnapshot(s => !s)} className="flex items-center justify-between w-full">
+              <CardTitle className="text-sm flex items-center gap-2"><FileText className="w-4 h-4 text-gray-500" /> Original Lead Data (pre-PO)</CardTitle>
+              {showSnapshot ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+            </button>
+          </CardHeader>
+          {showSnapshot && (
+            <CardContent>
+              {(() => {
+                let snap: any = {}
+                try { snap = JSON.parse(deal.poSnapshot) } catch { return <p className="text-sm text-gray-400">Snapshot unavailable.</p> }
+                const rows: [string, any][] = [
+                  ['Customer', snap.customerName], ['Company', snap.customerCompany],
+                  ['Email', snap.customerEmail], ['Phone', snap.customerPhone], ['State', snap.customerState],
+                  ['GST', snap.gstNumber], ['Model', snap.modelNumber], ['Application', snap.application],
+                  ['Material', snap.material], ['Motor', snap.motorType],
+                  ['Outer (W×H×D)', snap.outerWidth ? `${snap.outerWidth}×${snap.outerHeight}×${snap.outerDepth}` : null],
+                  ['Inner (W×H×D)', snap.innerWidth ? `${snap.innerWidth}×${snap.innerHeight}×${snap.innerDepth}` : null],
+                  ['Basic Price', snap.basicPrice], ['Final Price', snap.finalPrice], ['Quoted', snap.quotedAmount],
+                  ['Payment Terms', snap.paymentTerms], ['Freight Terms', snap.freightTerms], ['Inspection', snap.inspectionTerms],
+                ]
+                const shown = rows.filter(([, v]) => v !== null && v !== undefined && v !== '')
+                return (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1 text-sm">
+                    {shown.map(([label, v]) => (
+                      <div key={label} className="flex justify-between border-b border-gray-100 py-1"><span className="text-gray-500">{label}</span><span className="text-right">{String(v)}</span></div>
+                    ))}
+                    {snap.snapshotAt && <p className="text-xs text-gray-400 mt-2 md:col-span-2">Snapshotted {formatDate(snap.snapshotAt)}</p>}
+                  </div>
+                )
+              })()}
+            </CardContent>
+          )}
+        </Card>
       )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -1334,6 +1424,36 @@ export default function DealDetailPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {canSeeChangeHistory && (
+        <Card>
+          <CardHeader><CardTitle className="text-sm flex items-center gap-2"><Activity className="w-4 h-4 text-gray-500" /> Change History</CardTitle></CardHeader>
+          <CardContent>
+            {changeLogs.length === 0 ? (
+              <p className="text-sm text-gray-400">No changes recorded yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {changeLogs.map((log: any) => (
+                  <div key={log.id} className="flex items-start gap-3 text-sm border-b border-gray-100 pb-2">
+                    <div className="flex-1">
+                      <span className="font-medium text-gray-800">{log.field}</span>
+                      <span className="text-gray-500">: </span>
+                      <span className="text-red-600 line-through">{log.oldValue || '—'}</span>
+                      <span className="text-gray-400 mx-1">→</span>
+                      <span className="text-green-700">{log.newValue || '—'}</span>
+                    </div>
+                    <div className="text-xs text-gray-400 text-right whitespace-nowrap">
+                      <div>{log.userName || 'Unknown'}</div>
+                      <div>{formatDate(log.createdAt)}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {logType && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <Card className="w-full max-w-md mx-4">

@@ -150,6 +150,8 @@ model Deal {
   // Phase 1+2 additions
   serialNumber   String?  // e.g. AS-ABCP-SE1_050726_02
   dealFinalized  Boolean  @default(false)  // specs+commercials frozen
+  poSnapshot     String?  // JSON snapshot of the pre-PO (lead) data, kept for audit
+  finalDataEntered Boolean @default(false) // salesman has re-entered final PO data
   productOther   String?  // manual product name when productInterest = 'other'
   flooringType   String?  // ss_sheet, ms_pvc, grated, shoe_sole_cleaner, without, antistatic
   doorLeaf       String?  // single, double, without
@@ -200,6 +202,7 @@ model Deal {
   workOrders      WorkOrder[]
   materialRequests MaterialRequest[]
   inspection      InspectionChecklist?
+  changeLogs      ChangeLog[]
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -330,6 +333,18 @@ model Task {
   createdBy   User     @relation("CreatedTasks", fields: [createdById], references: [id])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model ChangeLog {
+  id        String   @id @default(cuid())
+  dealId    String
+  userId    String?
+  userName  String?
+  field     String
+  oldValue  String?
+  newValue  String?
+  createdAt DateTime @default(now())
+  deal      Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
 }
 
 model Document {

@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { ArrowLeft, Loader2 } from 'lucide-react'
@@ -13,6 +13,8 @@ const STATES = ['Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisga
 export default function EditDealPage() {
   const { id } = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const isFinal = searchParams.get('final') === '1'
   const { data: session } = useSession()
   const [tab, setTab] = useState(1)
   const [deal, setDeal] = useState<any>(null)
@@ -43,10 +45,11 @@ export default function EditDealPage() {
 
   const save = async (fields: Record<string, any>) => {
     setSaving(true)
+    const payload = isFinal ? { ...fields, finalDataEntered: true } : fields
     await fetch(`/api/deals/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(fields)
+      body: JSON.stringify(payload)
     })
     setSaving(false)
     setSaveMsg('Saved successfully')
@@ -67,10 +70,17 @@ export default function EditDealPage() {
           </button>
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Edit Deal</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{isFinal ? 'Final PO Data Entry' : 'Edit Deal'}</h1>
           <p className="text-gray-500 text-sm">{deal.customerCompany} — {deal.dealNumber}</p>
         </div>
       </div>
+
+      {isFinal && (
+        <div className="bg-amber-50 border border-amber-300 rounded-lg px-4 py-3">
+          <p className="text-sm font-semibold text-amber-800">Final PO Data Entry — this overwrites the deal with confirmed PO details</p>
+          <p className="text-xs text-amber-700 mt-1">The earlier lead data is preserved as a pre-PO snapshot. Save each tab to apply the confirmed values.</p>
+        </div>
+      )}
 
       {/* Tab buttons */}
       <div className="flex items-center gap-2 mb-6">

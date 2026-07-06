@@ -38,12 +38,9 @@ export default function LoginPage() {
       <div className="hidden lg:flex lg:w-1/2 bg-slate-900 flex-col justify-between p-12">
         <div>
           <div className="flex items-center gap-3 mb-12">
-            <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center">
-              <Wind className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-white font-bold text-xl">SamDesk</h1>
-              <p className="text-slate-400 text-xs">Business Management Platform</p>
+            <div className="bg-white rounded-lg px-4 py-3 inline-flex">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/sam-logo.svg" alt="SAM Products Pvt. Ltd." className="h-10 w-auto" />
             </div>
           </div>
           <div className="space-y-6">
@@ -70,19 +67,14 @@ export default function LoginPage() {
           </div>
         </div>
         <div>
-          <p className="text-slate-500 text-sm">&copy; 2024 SamDesk. Air Shower Manufacturing.</p>
+          <p className="text-slate-500 text-sm">&copy; {new Date().getFullYear()} SAM Products Pvt. Ltd. — Air Shower Manufacturing.</p>
         </div>
       </div>
       <div className="flex-1 flex items-center justify-center p-8 bg-slate-50">
         <div className="w-full max-w-md">
           <div className="lg:hidden flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center">
-              <Wind className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-slate-900 font-bold text-xl">SamDesk</h1>
-              <p className="text-slate-500 text-xs">Business Management Platform</p>
-            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/sam-logo.svg" alt="SAM Products Pvt. Ltd." className="h-10 w-auto" />
           </div>
           <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
             <h2 className="text-2xl font-bold text-slate-900 mb-1">Welcome back</h2>

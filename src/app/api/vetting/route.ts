@@ -99,6 +99,7 @@ export async function POST(req: NextRequest) {
     })
     const workCode = `SP/${mm}${yy}/${String(monthCount + 1).padStart(3, '0')}`
 
+    const advanceStage = deal.stage === 'po_received'
     const updated = await prisma.deal.update({
       where: { id: dealId },
       data: {
@@ -107,6 +108,7 @@ export async function POST(req: NextRequest) {
         vettedById: user.id,
         vettedAt: now,
         vettingNote: note || null,
+        ...(advanceStage ? { stage: 'po_vetted' } : {}),
       },
     })
 
@@ -119,6 +121,17 @@ export async function POST(req: NextRequest) {
         highlighted: true,
       },
     })
+
+    if (advanceStage) {
+      await prisma.activity.create({
+        data: {
+          dealId,
+          userId: user.id,
+          type: 'stage_change',
+          content: 'Stage changed to: po_vetted',
+        },
+      })
+    }
 
     return NextResponse.json(updated)
   }

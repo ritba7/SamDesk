@@ -70,6 +70,60 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const updateData: any = { ...rest }
   if (newStage) updateData.stage = newStage
 
+  // Final PO data re-entry: salesman re-enters confirmed PO details, overwriting
+  // the earlier lead data. Snapshot the pre-PO data before applying the update.
+  const isFinalEntry = updateData.finalDataEntered === true && existing.finalDataEntered === false
+  if (isFinalEntry && existing.poSnapshot == null) {
+    updateData.poSnapshot = JSON.stringify({
+      // customer
+      customerName: existing.customerName,
+      customerCompany: existing.customerCompany,
+      customerEmail: existing.customerEmail,
+      customerPhone: existing.customerPhone,
+      customerAddress: existing.customerAddress,
+      customerState: existing.customerState,
+      gstNumber: existing.gstNumber,
+      // specs
+      modelNumber: existing.modelNumber,
+      airShowerConfig: existing.airShowerConfig,
+      application: existing.application,
+      numberOfUsers: existing.numberOfUsers,
+      entryType: existing.entryType,
+      airFlowTime: existing.airFlowTime,
+      doorType: existing.doorType,
+      doorLeaf: existing.doorLeaf,
+      flooringRequired: existing.flooringRequired,
+      flooringType: existing.flooringType,
+      inputPower: existing.inputPower,
+      material: existing.material,
+      motorType: existing.motorType,
+      motorBrand: existing.motorBrand,
+      motorBrandOther: existing.motorBrandOther,
+      outerWidth: existing.outerWidth,
+      outerHeight: existing.outerHeight,
+      outerDepth: existing.outerDepth,
+      innerWidth: existing.innerWidth,
+      innerHeight: existing.innerHeight,
+      innerDepth: existing.innerDepth,
+      specNotes: existing.specNotes,
+      // commercial
+      basicPrice: existing.basicPrice,
+      discountType: existing.discountType,
+      discountValue: existing.discountValue,
+      finalPrice: existing.finalPrice,
+      quotedAmount: existing.quotedAmount,
+      freightBearer: existing.freightBearer,
+      freightAmount: existing.freightAmount,
+      assemblyAtSite: existing.assemblyAtSite,
+      assemblyCharge: existing.assemblyCharge,
+      warrantyTerms: existing.warrantyTerms,
+      paymentTerms: existing.paymentTerms,
+      freightTerms: existing.freightTerms,
+      inspectionTerms: existing.inspectionTerms,
+      snapshotAt: new Date().toISOString(),
+    })
+  }
+
   // Fields sales may always change; also allowed on finalized deals for non-directors
   const ALWAYS_EDITABLE = [
     'stage', 'nextFollowUpAt', 'nextFollowUpMode', 'heatScore',
@@ -86,7 +140,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   // Sales fill-blanks-only rule: a salesman may fill in blank fields but may
   // not overwrite existing details. Fields in ALWAYS_EDITABLE (stage,
   // follow-ups, commercials, dispatch, etc.) are exempt so those flows work.
-  if (user.role === 'sales') {
+  if (user.role === 'sales' && !isFinalEntry) {
     for (const key of Object.keys(updateData)) {
       if (ALWAYS_EDITABLE.includes(key)) continue
       const cur = (existing as any)[key]
@@ -98,7 +152,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   // Finalized deals: spec/commercial changes only for director/sales_director.
   // dealFinalized itself may only be set by sales/sales_director/director (freeze action).
-  if (existing.dealFinalized && !['director', 'sales_director'].includes(user.role)) {
+  if (existing.dealFinalized && !isFinalEntry && !['director', 'sales_director'].includes(user.role)) {
     const NOTES_FIELDS = ['internalNotes', 'lostReason', 'lostNotes', 'querySummary']
     const FINALIZED_LOCKED = [
       'basicPrice', 'discountType', 'discountValue', 'finalPrice',
@@ -132,10 +186,38 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
   // else keep existing heatScore (don't override)
 
+  // ---- CHANGE AUDIT LOG ---- diff updateData against existing; skip noisy auto fields
+  const SKIP_LOG_FIELDS = ['heatScore', 'updatedAt', 'poSnapshot']
+  const changeRows: any[] = []
+  for (const key of Object.keys(updateData)) {
+    if (SKIP_LOG_FIELDS.includes(key)) continue
+    const oldVal = (existing as any)[key]
+    const newVal = updateData[key]
+    const oldCmp = oldVal instanceof Date ? oldVal.toISOString() : oldVal
+    const newCmp = newVal instanceof Date ? new Date(newVal).toISOString() : newVal
+    if (String(oldCmp ?? '') === String(newCmp ?? '')) continue
+    changeRows.push({
+      dealId: params.id,
+      userId: user.id,
+      userName: user.name || null,
+      field: key,
+      oldValue: String(oldCmp ?? ''),
+      newValue: String(newCmp ?? ''),
+    })
+  }
+
   const deal = await prisma.deal.update({
     where: { id: params.id },
     data: updateData
   })
+
+  if (changeRows.length > 0) {
+    try {
+      await prisma.changeLog.createMany({ data: changeRows })
+    } catch (e) {
+      // logging must never break the update
+    }
+  }
 
   if (updateData.commercialsDone === true) {
     await prisma.activity.create({
@@ -162,6 +244,48 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         content: `Stage changed to: ${newStage}`,
       }
     })
+
+    // ---- PO RECEIVED BROADCAST ----
+    if (newStage === 'po_received' && existing.stage !== 'po_received') {
+      try {
+        const [vpUser, mfgUser, directorUser, salesDirector] = await Promise.all([
+          prisma.user.findFirst({ where: { role: 'vp' } }),
+          prisma.user.findFirst({ where: { role: 'manufacturing' } }),
+          prisma.user.findFirst({ where: { role: 'director' } }),
+          prisma.user.findFirst({ where: { role: 'sales_director' } }),
+        ])
+        const salesmanId = deal.assignedToId
+        const recipientIds = Array.from(new Set([
+          vpUser?.id, mfgUser?.id, directorUser?.id, salesmanId, salesDirector?.id,
+        ].filter((x): x is string => !!x)))
+        const dueDate = new Date()
+        dueDate.setDate(dueDate.getDate() + 1)
+        const title = `PO received — ${deal.customerCompany} (${deal.serialNumber || deal.dealNumber})`
+        if (recipientIds.length > 0) {
+          await prisma.task.createMany({
+            data: recipientIds.map(rid => ({
+              dealId: deal.id,
+              title,
+              assignedToId: rid,
+              createdById: user.id,
+              dueDate,
+              type: 'other',
+            })),
+          })
+        }
+        await prisma.activity.create({
+          data: {
+            dealId: deal.id,
+            userId: user.id,
+            type: 'note',
+            content: 'PO received — broadcast to VP, Manufacturing, Director, Sales & Sales Director',
+            highlighted: true,
+          },
+        })
+      } catch (e) {
+        // broadcast failures must not break the stage change
+      }
+    }
 
     // Auto follow-up task based on new stage
     const followupCfg = FOLLOWUP_CONFIG.find(c => c.stage === newStage)

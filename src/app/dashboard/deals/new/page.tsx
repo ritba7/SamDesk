@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { ArrowLeft, Loader2, CheckCircle, AlertCircle, Copy, Check, Plus, X } from 'lucide-react'
 import Link from 'next/link'
 import ModelSelector from '@/components/ModelSelector'
@@ -33,6 +34,9 @@ interface ExtraContact {
 
 export default function NewDealPage() {
   const router = useRouter()
+  const { data: session } = useSession()
+  const role = (session?.user as any)?.role
+  const canAssign = ['director', 'sales_director', 'vp', 'accounts'].includes(role)
   const [step, setStep] = useState(1)
   const [users, setUsers] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
@@ -782,13 +786,15 @@ export default function NewDealPage() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-5">
           <h2 className="text-base font-semibold text-gray-900 mb-4">Assignment, Remarks & Follow-up</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>Assigned To</label>
-              <select name="assignedToId" value={form.assignedToId} onChange={handleChange} className={inputCls}>
-                <option value="">Unassigned</option>
-                {users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
-              </select>
-            </div>
+            {canAssign && (
+              <div>
+                <label className={labelCls}>Assigned To</label>
+                <select name="assignedToId" value={form.assignedToId} onChange={handleChange} className={inputCls}>
+                  <option value="">Unassigned</option>
+                  {users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
+                </select>
+              </div>
+            )}
             <div>
               <label className={labelCls}>Heat Score</label>
               <select name="heatScore" value={form.heatScore} onChange={handleChange} className={inputCls}>

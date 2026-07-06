@@ -91,6 +91,9 @@ export async function POST(req: NextRequest) {
   const todayCount = await prisma.deal.count({ where: { createdAt: { gte: startOfDay, lte: endOfDay } } })
   const serialNumber = `${prodCode}-${comp4}-${initials}_${dd}${mm}${yy}_${String(todayCount + 1).padStart(2, '0')}`
 
+  // A salesman's new deals are always assigned to himself
+  const effectiveAssignedToId = user.role === 'sales' ? user.id : assignedToId
+
   const deal = await prisma.deal.create({
     data: {
       customerName,
@@ -111,7 +114,7 @@ export async function POST(req: NextRequest) {
       ...(verificationScore !== undefined ? { verificationScore: Number(verificationScore) } : {}),
       ...(verificationData ? { verificationData } : {}),
       ...(heatScore ? { heatScore } : {}),
-      ...(assignedToId ? { assignedToId } : {}),
+      ...(effectiveAssignedToId ? { assignedToId: effectiveAssignedToId } : {}),
       ...(material ? { material } : {}),
       ...(motorType ? { motorType } : {}),
       ...(motorBrand ? { motorBrand } : {}),

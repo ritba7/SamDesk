@@ -62,6 +62,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
+  // PO vetting is done by Accounts — sales may move up to po_received but not po_vetted
+  if (user.role === 'sales' && newStage === 'po_vetted') {
+    return NextResponse.json({ error: 'PO vetting is done by Accounts.' }, { status: 403 })
+  }
+
   const updateData: any = { ...rest }
   if (newStage) updateData.stage = newStage
 
@@ -78,10 +83,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     'dispatchStatus', 'dispatchDate', 'packingListNote',
   ]
 
-  // A salesman may fully edit his OWN deals (specs, commercials, payment terms)
-  // up until the deal is finalized/frozen. The finalized guard below still
-  // locks specs/commercials for sales after freeze. Ownership was already
-  // enforced above.
+  // Sales fill-blanks-only rule: a salesman may fill in blank fields but may
+  // not overwrite existing details. Fields in ALWAYS_EDITABLE (stage,
+  // follow-ups, commercials, dispatch, etc.) are exempt so those flows work.
+  if (user.role === 'sales') {
+    for (const key of Object.keys(updateData)) {
+      if (ALWAYS_EDITABLE.includes(key)) continue
+      const cur = (existing as any)[key]
+      if (cur !== null && cur !== undefined && cur !== '') {
+        delete updateData[key]
+      }
+    }
+  }
 
   // Finalized deals: spec/commercial changes only for director/sales_director.
   // dealFinalized itself may only be set by sales/sales_director/director (freeze action).

@@ -18,6 +18,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { formatCurrency, formatDate, getStageColor, getStageLabel, STAGES, PRODUCTION_STAGES } from '@/lib/utils'
 import { generateQuote } from '@/lib/generateQuote'
 import { generatePI } from '@/lib/generatePI'
+import Confetti from '@/components/Confetti'
 
 const STAGE_FLOW = ['inquiry','tds_sent','quote_sent','follow_up','po_received','po_vetted','pi_sent','approval_pending','production','dispatch_ready','dispatched','feedback_pending','closed_won']
 
@@ -338,6 +339,7 @@ export default function DealDetailPage() {
   const [note, setNote] = useState('')
   const [savingNote, setSavingNote] = useState(false)
   const [stageLoading, setStageLoading] = useState(false)
+  const [celebrate, setCelebrate] = useState(false)
   const [logType, setLogType] = useState<'call'|'email'|'negotiation'|null>(null)
   const [logContent, setLogContent] = useState('')
   const [loggingActivity, setLoggingActivity] = useState(false)
@@ -399,8 +401,15 @@ export default function DealDetailPage() {
 
   const changeStage = async (newStage: string) => {
     if (!deal) return; setStageLoading(true)
+    const prevStage = deal.stage
     const res = await fetch(`/api/deals/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ stage: newStage }) })
-    if (res.ok) await fetchDeal()
+    if (res.ok) {
+      if (newStage === 'po_received' && prevStage !== 'po_received') {
+        setCelebrate(true)
+        setTimeout(() => setCelebrate(false), 3200)
+      }
+      await fetchDeal()
+    }
     setStageLoading(false)
   }
 
@@ -468,14 +477,16 @@ export default function DealDetailPage() {
   }
 
   const submitFollowUp = async () => {
-    if (!fuAssignee || fuDays < 1) return
+    // Sales always self-assign (to the deal's own salesman); others pick an assignee
+    const assignee = role === 'sales' ? (deal?.assignedToId || user?.id) : fuAssignee
+    if (!assignee || fuDays < 1) return
     setFuSaving(true)
     const dueDate = new Date()
     dueDate.setDate(dueDate.getDate() + fuDays)
     await fetch('/api/tasks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dealId: id, title: fuNote || `Follow-up — ${deal?.customerName}`, assignedToId: fuAssignee, dueDate: dueDate.toISOString(), type: 'follow_up', status: 'pending' })
+      body: JSON.stringify({ dealId: id, title: fuNote || `Follow-up — ${deal?.customerName}`, assignedToId: assignee, dueDate: dueDate.toISOString(), type: 'follow_up', status: 'pending' })
     })
     setFuNote(''); setFuAssignee(''); setFuDays(3)
     await fetchDeal()
@@ -591,6 +602,14 @@ export default function DealDetailPage() {
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
+      {celebrate && (
+        <>
+          <Confetti />
+          <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[101] bg-white border border-green-200 shadow-lg rounded-full px-5 py-2.5 text-sm font-semibold text-green-700">
+            🎉 PO Received!
+          </div>
+        </>
+      )}
       <div className="flex items-start justify-between">
         <div className="flex items-start gap-3">
           <Link href="/dashboard/deals"><Button variant="ghost" size="icon"><ArrowLeft className="w-4 h-4" /></Button></Link>
@@ -635,7 +654,12 @@ export default function DealDetailPage() {
         {canEdit && !isLost && !isWon && (
           <div>
             <div className="flex items-center gap-2 flex-wrap justify-end">
-              {nextStage && <Button onClick={() => changeStage(nextStage)} disabled={stageLoading} size="sm">Move to {getStageLabel(nextStage)} <ChevronRight className="w-3 h-3" /></Button>}
+              {nextStage && !(role === 'sales' && deal.stage === 'po_received' && nextStage === 'po_vetted') && (
+                <Button onClick={() => changeStage(nextStage)} disabled={stageLoading} size="sm">Move to {getStageLabel(nextStage)} <ChevronRight className="w-3 h-3" /></Button>
+              )}
+              {role === 'sales' && deal.stage === 'po_received' && (
+                <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-3 py-1">Awaiting Accounts vetting</span>
+              )}
               {canOpenEditForm && (
                 <Link href={`/dashboard/deals/${id}/edit`}>
                   <Button size="sm"><Pencil className="w-3 h-3 mr-1" />Edit Deal</Button>
@@ -887,14 +911,16 @@ export default function DealDetailPage() {
             <Card>
               <CardHeader><CardTitle className="text-sm">Set Manual Follow-up</CardTitle></CardHeader>
               <CardContent className="space-y-3">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <select value={fuAssignee} onChange={e => setFuAssignee(e.target.value)}
-                    className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white">
-                    <option value="">Select assignee…</option>
-                    {users.map((u: any) => (
-                      <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
-                    ))}
-                  </select>
+                <div className={`grid grid-cols-1 ${role === 'sales' ? 'md:grid-cols-2' : 'md:grid-cols-3'} gap-3`}>
+                  {role !== 'sales' && (
+                    <select value={fuAssignee} onChange={e => setFuAssignee(e.target.value)}
+                      className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white">
+                      <option value="">Select assignee…</option>
+                      {users.map((u: any) => (
+                        <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
+                      ))}
+                    </select>
+                  )}
                   <input type="number" min={1} max={90} value={fuDays} onChange={e => setFuDays(Number(e.target.value))}
                     placeholder="Days until due"
                     className="border border-gray-200 rounded-lg px-3 py-2 text-sm" />
@@ -902,7 +928,8 @@ export default function DealDetailPage() {
                     placeholder="Task note / title (optional)"
                     className="border border-gray-200 rounded-lg px-3 py-2 text-sm" />
                 </div>
-                <Button size="sm" onClick={submitFollowUp} disabled={fuSaving || !fuAssignee || fuDays < 1}>
+                {role === 'sales' && <p className="text-xs text-gray-400">This follow-up will be assigned to you.</p>}
+                <Button size="sm" onClick={submitFollowUp} disabled={fuSaving || (role !== 'sales' && !fuAssignee) || fuDays < 1}>
                   {fuSaving ? 'Creating…' : 'Create Follow-up Task'}
                 </Button>
               </CardContent>

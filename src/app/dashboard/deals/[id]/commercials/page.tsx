@@ -80,6 +80,7 @@ export default function CommercialsPage() {
     warrantyTerms: DEFAULT_WARRANTY,
   })
   const [milestones, setMilestones] = useState<Milestone[]>(PRESETS[0].rows)
+  const [finalInput, setFinalInput] = useState('')
 
   const user = session?.user as any
   const role = user?.role
@@ -99,6 +100,7 @@ export default function CommercialsPage() {
           paymentTerms: d.paymentTerms || DEFAULT_PAYMENT,
           warrantyTerms: d.warrantyTerms || DEFAULT_WARRANTY,
         })
+        setFinalInput(d.finalPrice != null ? String(d.finalPrice) : '')
         if (d.paymentSchedule) {
           try {
             const parsed = JSON.parse(d.paymentSchedule)
@@ -120,8 +122,14 @@ export default function CommercialsPage() {
 
   const basic = parseFloat(form.basicPrice) || 0
   const discVal = parseFloat(form.discountValue) || 0
-  const discount = form.discountType === 'percent' ? basic * discVal / 100 : discVal
-  const finalPrice = Math.max(0, basic - discount)
+  const finalEntered = parseFloat(finalInput) || 0
+  // In 'final' mode the user enters the final price directly and we derive the discount.
+  const isFinalMode = form.discountType === 'final'
+  const discount = isFinalMode
+    ? Math.max(0, basic - finalEntered)
+    : (form.discountType === 'percent' ? basic * discVal / 100 : discVal)
+  const finalPrice = isFinalMode ? Math.max(0, finalEntered) : Math.max(0, basic - discount)
+  const derivedDiscountPct = basic > 0 ? (discount / basic) * 100 : 0
   const gstAmount = finalPrice * 0.18
   const grandTotal = finalPrice + gstAmount
 
@@ -134,8 +142,9 @@ export default function CommercialsPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         basicPrice: basic || null,
-        discountType: form.discountType,
-        discountValue: discVal || null,
+        // In 'final' mode we persist the derived percentage as a normal percent discount.
+        discountType: isFinalMode ? 'percent' : form.discountType,
+        discountValue: isFinalMode ? (derivedDiscountPct || null) : (discVal || null),
         finalPrice: finalPrice || null,
         freightBearer: form.freightBearer || null,
         freightAmount: parseFloat(form.freightAmount) || null,
@@ -193,17 +202,32 @@ export default function CommercialsPage() {
                     className={`px-3 text-sm ${form.discountType === 'percent' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600'}`}>%</button>
                   <button type="button" disabled={readOnly} onClick={() => set('discountType', 'amount')}
                     className={`px-3 text-sm ${form.discountType === 'amount' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600'}`}>₹</button>
+                  <button type="button" disabled={readOnly} onClick={() => set('discountType', 'final')}
+                    className={`px-3 text-sm whitespace-nowrap ${form.discountType === 'final' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600'}`}>Set Final Price</button>
                 </div>
-                <input type="number" value={form.discountValue} onChange={e => set('discountValue', e.target.value)} disabled={readOnly}
-                  className={inputCls} placeholder={form.discountType === 'percent' ? 'e.g. 5' : 'e.g. 25000'} />
+                {!isFinalMode && (
+                  <input type="number" value={form.discountValue} onChange={e => set('discountValue', e.target.value)} disabled={readOnly}
+                    className={inputCls} placeholder={form.discountType === 'percent' ? 'e.g. 5' : 'e.g. 25000'} />
+                )}
               </div>
             </div>
-            <div>
-              <label className={labelCls}>Final Price (auto)</label>
-              <div className="h-9 px-3 flex items-center rounded-md border border-green-200 bg-green-50 text-sm font-semibold text-green-800">
-                {formatCurrency(finalPrice)}
+            {isFinalMode ? (
+              <div>
+                <label className={labelCls}>Final Price (₹)</label>
+                <input type="number" value={finalInput} onChange={e => setFinalInput(e.target.value)} disabled={readOnly}
+                  className={inputCls} placeholder="e.g. 475000" />
+                <p className="mt-1 text-xs text-gray-500">
+                  Derived discount: <span className="font-semibold text-gray-700">{derivedDiscountPct.toFixed(2)}%</span> ({formatCurrency(discount)})
+                </p>
               </div>
-            </div>
+            ) : (
+              <div>
+                <label className={labelCls}>Final Price (auto)</label>
+                <div className="h-9 px-3 flex items-center rounded-md border border-green-200 bg-green-50 text-sm font-semibold text-green-800">
+                  {formatCurrency(finalPrice)}
+                </div>
+              </div>
+            )}
           </div>
           <div className="rounded-lg bg-gray-50 border border-gray-200 p-3 text-sm space-y-1">
             <div className="flex justify-between"><span className="text-gray-500">GST</span><span>18% (HSN 84145930) — {formatCurrency(gstAmount)}</span></div>

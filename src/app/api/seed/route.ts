@@ -30,8 +30,8 @@ async function runSeed(req: NextRequest) {
       { name: 'Design Head', email: 'design@samdesk.in', password: process.env.DESIGN_PASSWORD || 'Design@123', role: 'design' },
       { name: 'Sales Executive', email: 'sales@samdesk.in', password: process.env.SALES_PASSWORD || 'Sales@123', role: 'sales' },
       { name: 'Sales Director', email: 'salesdirector@samdesk.in', password: process.env.SALES_DIRECTOR_PASSWORD || 'SalesDir@123', role: 'sales_director' },
-      ...[1, 2, 3, 4, 5, 6].map(n => ({
-        name: `Sales Executive ${n}`,
+      ...([['Alpha', 1], ['Beta', 2], ['Gamma', 3], ['Delta', 4], ['Epsilon', 5], ['Zeta', 6]] as [string, number][]).map(([nm, n]) => ({
+        name: `Sales — ${nm}`,
         email: `sales${n}@samdesk.in`,
         password: process.env[`SALES${n}_PASSWORD`] || `Sales${n}@123`,
         role: 'sales',

@@ -213,12 +213,18 @@ export function generateQuote(deal: any): void {
     included: 'Included in Basic Price',
     visit_after_supply: `Visit After Supply — extra ${deal.assemblyCharge ? inr(Number(deal.assemblyCharge)) : 'chargeable'}`,
   }
+  // Installation/assembly only shown when the customer actually opts for it
+  const wantsInstallation = !!deal.assemblyAtSite && deal.assemblyAtSite !== 'not_required'
   const freightRow: any[] | null = deal.freightBearer
     ? [{ content: 'Freight', colSpan: 4, styles: { halign: 'right' } }, { content: FREIGHT_MAP[deal.freightBearer] || deal.freightBearer }]
     : null
-  const assemblyRow: any[] | null = deal.assemblyAtSite
+  const assemblyRow: any[] | null = wantsInstallation
     ? [{ content: 'Installation / Assembly', colSpan: 4, styles: { halign: 'right' } }, { content: ASSEMBLY_MAP[deal.assemblyAtSite] || deal.assemblyAtSite }]
     : null
+
+  const basicLineAmount = basic * qty
+  const discountLineAmount = discountAmt * qty
+  const discountLabel = `Discount${deal.discountType === 'percent' ? ` (${deal.discountValue}%)` : ''}`
 
   if (y > 230) { doc.addPage(); y = 20 }
 
@@ -226,9 +232,15 @@ export function generateQuote(deal: any): void {
     startY: y,
     head: [['Sl No', 'Model # Size', 'Basic Cost/Pc (INR)', 'Qty', 'Amount']],
     body: [
-      ['1', modelSize, inr(unitFinal), String(qty), inr(lineAmount)] as any,
-      ...(hasDiscount ? [[{ content: `(Basic ${inr(basic)} less discount ${deal.discountType === 'percent' ? `${deal.discountValue}%` : inr(discountAmt)})`, colSpan: 5, styles: { fontSize: 7, textColor: [100, 100, 100] } }] as any] : []),
-      [{ content: 'TOTAL', colSpan: 4, styles: { halign: 'right', fontStyle: 'bold' } }, { content: inr(lineAmount), styles: { fontStyle: 'bold' } }] as any,
+      // Show initial price per pc when a discount applies; otherwise show final unit price
+      ['1', modelSize, inr(hasDiscount ? basic : unitFinal), String(qty), inr(hasDiscount ? basicLineAmount : lineAmount)] as any,
+      ...(hasDiscount ? [
+        [{ content: 'Basic / Initial Price', colSpan: 4, styles: { halign: 'right' } }, { content: inr(basicLineAmount) }] as any,
+        [{ content: discountLabel, colSpan: 4, styles: { halign: 'right' } }, { content: `- ${inr(discountLineAmount)}` }] as any,
+        [{ content: 'Final Price', colSpan: 4, styles: { halign: 'right', fontStyle: 'bold' } }, { content: inr(lineAmount), styles: { fontStyle: 'bold' } }] as any,
+      ] : [
+        [{ content: 'TOTAL', colSpan: 4, styles: { halign: 'right', fontStyle: 'bold' } }, { content: inr(lineAmount), styles: { fontStyle: 'bold' } }] as any,
+      ]),
       [{ content: 'Add GST @18% (HSN 84145930)', colSpan: 4, styles: { halign: 'right' } }, { content: inr(gst) }] as any,
       ...(freightRow ? [freightRow] : []),
       ...(assemblyRow ? [assemblyRow] : []),
@@ -273,7 +285,7 @@ export function generateQuote(deal: any): void {
     `Dispatch: ${dispatch}`,
     `Payment Terms: ${payment}`,
     'Air Shower supplied in "Plug & Play" unless specified by Buyer in writing.',
-    'Assembly at site: ₹40,000/Pc + GST (SAC 998736). Dismantling/Re-assembly extra chargeable.',
+    ...(wantsInstallation ? ['Assembly at site: ₹40,000/Pc + GST (SAC 998736). Dismantling/Re-assembly extra chargeable.'] : []),
     freight,
     'Shifting & unloading at customer scope. Insurance — freight bearer pays.',
     'Standard Packing (Paper Corrugated + Stretch Film) included. Wooden Crate extra on request.',

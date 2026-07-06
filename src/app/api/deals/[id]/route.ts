@@ -78,16 +78,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     'dispatchStatus', 'dispatchDate', 'packingListNote',
   ]
 
-  // Sales cannot overwrite fields that already hold a value — only fill blanks
-  if (user.role === 'sales') {
-    for (const key of Object.keys(updateData)) {
-      if (ALWAYS_EDITABLE.includes(key)) continue
-      const existingValue = (existing as any)[key]
-      if (existingValue !== null && existingValue !== undefined && existingValue !== '') {
-        delete updateData[key]
-      }
-    }
-  }
+  // A salesman may fully edit his OWN deals (specs, commercials, payment terms)
+  // up until the deal is finalized/frozen. The finalized guard below still
+  // locks specs/commercials for sales after freeze. Ownership was already
+  // enforced above.
 
   // Finalized deals: spec/commercial changes only for director/sales_director.
   // dealFinalized itself may only be set by sales/sales_director/director (freeze action).

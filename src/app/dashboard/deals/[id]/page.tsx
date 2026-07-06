@@ -9,7 +9,7 @@ import {
   Activity, DollarSign, Factory, Calendar,
   MessageSquare, AlertCircle, Check, Download,
   Shield, Phone, Mail as MailIcon, Pencil, Copy, TrendingUp, Edit, Star, Lock,
-  IndianRupee, ShieldCheck, Send, ClipboardList, Package, Truck, X, ChevronDown, ChevronUp
+  IndianRupee, ShieldCheck, Send, ClipboardList, Package, Truck, X, ChevronDown, ChevronUp, Trash2
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -331,6 +331,7 @@ function DispatchSection({ deal, role, onChanged }: { deal: any, role: string, o
 
 export default function DealDetailPage() {
   const { id } = useParams()
+  const router = useRouter()
   const { data: session } = useSession()
   const [deal, setDeal] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -401,6 +402,13 @@ export default function DealDetailPage() {
     const res = await fetch(`/api/deals/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ stage: newStage }) })
     if (res.ok) await fetchDeal()
     setStageLoading(false)
+  }
+
+  const deleteDeal = async () => {
+    if (!confirm('Delete this lead permanently? This removes all its activities, tasks, payments and documents and cannot be undone.')) return
+    const res = await fetch(`/api/deals/${id}`, { method: 'DELETE' })
+    if (res.ok) router.push('/dashboard/deals')
+    else alert('Failed to delete: ' + ((await res.json()).error || 'unknown error'))
   }
 
   const addNote = async () => {
@@ -639,6 +647,9 @@ export default function DealDetailPage() {
                 </Link>
               )}
               <Button variant="destructive" size="sm" onClick={() => changeStage('closed_lost')}>Mark Lost</Button>
+              {['director', 'sales_director'].includes(role) && (
+                <Button variant="destructive" size="sm" onClick={deleteDeal} className="bg-red-700 hover:bg-red-800"><Trash2 className="w-3 h-3 mr-1" />Delete</Button>
+              )}
             </div>
             <div className="flex items-center gap-2 mt-2 flex-wrap justify-end">
               <Button variant="outline" size="sm" onClick={() => setLogType('call')}><Phone className="w-3 h-3 mr-1" />Log Call</Button>

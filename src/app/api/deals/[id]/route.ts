@@ -255,8 +255,24 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const user = session.user as any
-  if (user.role !== 'director') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!['director', 'sales_director'].includes(user.role)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
-  await prisma.deal.delete({ where: { id: params.id } })
+  const id = params.id
+  // Remove dependent records first (only ContactPerson cascades automatically).
+  await prisma.$transaction([
+    prisma.workOrder.deleteMany({ where: { dealId: id } }),
+    prisma.proformaInvoice.deleteMany({ where: { dealId: id } }),
+    prisma.materialRequest.deleteMany({ where: { dealId: id } }),
+    prisma.inspectionChecklist.deleteMany({ where: { dealId: id } }),
+    prisma.productionStage.deleteMany({ where: { dealId: id } }),
+    prisma.payment.deleteMany({ where: { dealId: id } }),
+    prisma.quote.deleteMany({ where: { dealId: id } }),
+    prisma.document.deleteMany({ where: { dealId: id } }),
+    prisma.task.deleteMany({ where: { dealId: id } }),
+    prisma.activity.deleteMany({ where: { dealId: id } }),
+    prisma.deal.delete({ where: { id } }),
+  ])
   return NextResponse.json({ success: true })
 }

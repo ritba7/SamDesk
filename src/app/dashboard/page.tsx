@@ -56,7 +56,7 @@ export default function DashboardPage() {
         const [dealsRes, tasksRes] = await Promise.all([fetch('/api/deals'), fetch('/api/tasks')])
         setDeals(Array.isArray(await dealsRes.json()) ? await (await fetch('/api/deals')).json() : [])
         setTasks(Array.isArray(await tasksRes.json()) ? await (await fetch('/api/tasks')).json() : [])
-        if (role === 'director') {
+        if (role === 'director' || role === 'sales_director') {
           const ar = await fetch('/api/analytics')
           if (ar.ok) setAnalytics(await ar.json())
         }
@@ -71,7 +71,7 @@ export default function DashboardPage() {
       const d = await dr.json(); const t = await tr.json()
       setDeals(Array.isArray(d) ? d : [])
       setTasks(Array.isArray(t) ? t : [])
-      if (role === 'director') fetch('/api/analytics').then(r => r.ok ? r.json().then(setAnalytics) : null)
+      if (role === 'director' || role === 'sales_director') fetch('/api/analytics').then(r => r.ok ? r.json().then(setAnalytics) : null)
       setLoading(false)
     })
   }, [role])
@@ -116,10 +116,10 @@ export default function DashboardPage() {
     )
   }
 
-  if (role === 'director' && analytics) {
+  if ((role === 'director' || role === 'sales_director') && analytics) {
     return (
       <div className="space-y-6">
-        <div><h1 className="text-2xl font-bold text-gray-900">Director Dashboard</h1><p className="text-gray-500 mt-1">Business overview</p></div>
+        <div><h1 className="text-2xl font-bold text-gray-900">{role === 'sales_director' ? 'Sales Director Dashboard' : 'Director Dashboard'}</h1><p className="text-gray-500 mt-1">Business overview</p></div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard title="Total Deals" value={analytics.total} icon={FileText} />
           <StatCard title="Won" value={analytics.won} icon={TrendingUp} color="green" sub={`${analytics.conversionRate}% rate`} />
@@ -183,7 +183,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">{role === 'vp' ? 'VP Dashboard' : role === 'accounts' ? 'Accounts Dashboard' : 'Design Dashboard'}</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{role === 'vp' ? 'VP Dashboard' : role === 'accounts' ? 'Accounts Dashboard' : role === 'sales' ? 'Sales Dashboard' : role === 'sales_director' ? 'Sales Director Dashboard' : 'Design Dashboard'}</h1>
         <p className="text-gray-500 mt-1">Welcome back, {user?.name}</p>
       </div>
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">

@@ -167,6 +167,7 @@ model Deal {
   assemblyCharge    Float?
   warrantyTerms     String?   @default("365 days from date of supply (dispatch) or 419 days from date of intimation of inspection")
   insuranceNote     String?   @default("Insurance to freight bearer's scope")
+  paymentSchedule   String?   // JSON array of payment milestones [{label,type,value,trigger,days,note}]
   commercialsDone   Boolean   @default(false)
 
   // Vetting flow

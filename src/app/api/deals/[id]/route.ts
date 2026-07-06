@@ -73,7 +73,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     // Commercials — editable by sales until deal is finalized (finalized guard below still applies)
     'basicPrice', 'discountType', 'discountValue', 'finalPrice',
     'freightBearer', 'freightAmount', 'assemblyAtSite', 'assemblyCharge',
-    'warrantyTerms', 'insuranceNote', 'commercialsDone', 'paymentTerms',
+    'warrantyTerms', 'insuranceNote', 'commercialsDone', 'paymentTerms', 'paymentSchedule',
     // Dispatch chain fields (primary path is /api/dispatch, but allow direct PATCH)
     'dispatchStatus', 'dispatchDate', 'packingListNote',
   ]
@@ -90,7 +90,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const FINALIZED_LOCKED = [
       'basicPrice', 'discountType', 'discountValue', 'finalPrice',
       'freightBearer', 'freightAmount', 'assemblyAtSite', 'assemblyCharge',
-      'warrantyTerms', 'insuranceNote', 'commercialsDone', 'paymentTerms',
+      'warrantyTerms', 'insuranceNote', 'commercialsDone', 'paymentTerms', 'paymentSchedule',
     ]
     for (const key of Object.keys(updateData)) {
       if ((ALWAYS_EDITABLE.includes(key) && !FINALIZED_LOCKED.includes(key)) || NOTES_FIELDS.includes(key)) continue

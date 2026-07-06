@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import { drawSamLogo } from './pdfLogo'
 
 const BLUE: [number, number, number] = [0, 112, 192]
 const DARK: [number, number, number] = [33, 33, 33]
@@ -61,15 +62,11 @@ export function generateQuote(deal: any): void {
   // ---- Header ----
   doc.setFillColor(...BLUE)
   doc.rect(0, 0, pageW, 26, 'F')
+  drawSamLogo(doc, margin, 2, WHITE)
   doc.setTextColor(...WHITE)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(18)
-  doc.text('SAM PRODUCTS (P) Ltd', margin, 11)
   doc.setFont('helvetica', 'normal')
-  doc.setFontSize(8)
-  doc.text('SINCE 1992', margin, 16)
   doc.setFontSize(7)
-  doc.text('H-161, Site V, UPSIDA, Greater Noida 201310, U.P., INDIA', margin, 21)
+  doc.text('SINCE 1992  ·  H-161, Site V, UPSIDA, Kasna, Greater Noida 201310, U.P., INDIA', margin, 22)
   doc.text('Ph: 9810065139', pageW - margin, 8, { align: 'right' })
   doc.text('samproducts1992@gmail.com | samproducts25@gmail.com', pageW - margin, 13, { align: 'right' })
   doc.text('www.samproducts.net', pageW - margin, 18, { align: 'right' })

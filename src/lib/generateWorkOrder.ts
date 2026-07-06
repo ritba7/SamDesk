@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { WO_TEMPLATE, WoField } from './woTemplate'
+import { drawSamLogo } from './pdfLogo'
 
 const BLUE: [number, number, number] = [0, 112, 192]
 const WHITE: [number, number, number] = [255, 255, 255]
@@ -38,15 +39,14 @@ export function generateWorkOrder(wo: any): void {
   // Header
   doc.setFillColor(...BLUE)
   doc.rect(0, 0, pageW, 24, 'F')
+  drawSamLogo(doc, margin, 1, WHITE)
   doc.setTextColor(...WHITE)
-  doc.setFontSize(15)
   doc.setFont('helvetica', 'bold')
-  doc.text('WORK ORDER — AIR SHOWER', margin, 10)
-  doc.setFontSize(10)
-  doc.text('SAM PRODUCTS PVT LTD', margin, 16)
+  doc.setFontSize(13)
+  doc.text('WORK ORDER — AIR SHOWER', pageW - margin, 12, { align: 'right' })
   doc.setFontSize(8)
   doc.setFont('helvetica', 'normal')
-  doc.text('ISO 9001:2015', margin, 21)
+  doc.text('SAM PRODUCTS PVT LTD · ISO 9001:2015', pageW - margin, 18, { align: 'right' })
   doc.setFontSize(10)
   doc.setFont('helvetica', 'bold')
   doc.text(`WO: ${wo.woNumber}`, pageW - margin, 12, { align: 'right' })

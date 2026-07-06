@@ -173,13 +173,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
       <div className={cn('flex items-center gap-3 p-4 border-b border-slate-700/50', collapsed && 'justify-center')}>
-        <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center flex-shrink-0">
-          <Wind className="w-5 h-5 text-white" />
-        </div>
-        {!collapsed && (
-          <div>
-            <p className="text-white font-bold text-base leading-none">SamDesk</p>
-            <p className="text-slate-400 text-xs mt-0.5">Air Shower Mfg.</p>
+        {collapsed ? (
+          <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center flex-shrink-0">
+            <Wind className="w-5 h-5 text-white" />
+          </div>
+        ) : (
+          <div className="bg-white rounded-lg px-3 py-2 w-full">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/sam-logo.svg" alt="SAM Products Pvt. Ltd." className="h-8 w-auto" />
           </div>
         )}
       </div>

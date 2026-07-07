@@ -328,6 +328,7 @@ model Task {
   dueDate     DateTime?
   status      String   @default("pending") // pending, done
   type        String   @default("follow_up") // follow_up, document, call, other
+  advancesToStage String? // when this task is completed, move the deal to this stage
   deal        Deal?    @relation(fields: [dealId], references: [id])
   assignedTo  User     @relation("AssignedTasks", fields: [assignedToId], references: [id])
   createdBy   User     @relation("CreatedTasks", fields: [createdById], references: [id])

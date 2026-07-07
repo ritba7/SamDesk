@@ -252,6 +252,8 @@ export async function POST(req: NextRequest) {
           type: 'document',
           assignedToId: tdsAssigneeId,
           createdById: user.id,
+          // Only the deal's own salesman's task advances the stage when ticked.
+          ...(tdsAssigneeId === dealSalesmanId ? { advancesToStage: 'tds_sent' } : {}),
         }
       })
     }

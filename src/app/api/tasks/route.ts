@@ -40,8 +40,13 @@ export async function POST(req: NextRequest) {
   const user = session.user as any
   const body = await req.json()
 
+  // A salesman may only create tasks assigned to himself. Any other assignee is overridden.
+  // Leadership / vp / accounts may assign to others.
+  const canAssignOthers = ['director', 'sales_director', 'vp', 'accounts'].includes(user.role)
+  const assignedToId = canAssignOthers ? (body.assignedToId || user.id) : user.id
+
   const task = await prisma.task.create({
-    data: { ...body, createdById: user.id }
+    data: { ...body, assignedToId, createdById: user.id }
   })
 
   return NextResponse.json(task)

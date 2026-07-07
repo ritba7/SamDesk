@@ -25,8 +25,13 @@ export async function GET(req: NextRequest) {
     where.OR = [{ assignedToId: user.id }, { createdById: user.id }]
   }
   if (user.role === 'accounts') {
-    // Accounts only see finalized deals (vetting/billing)
-    where.dealFinalized = true
+    // Accounts see a deal once it is finalized OR submitted for any vetting
+    // (quote vetting / PO vetting happen before finalize).
+    where.OR = [
+      { dealFinalized: true },
+      { vettingStatus: { in: ['pending', 'approved'] } },
+      { quoteVetStatus: { in: ['requested', 'vetted'] } },
+    ]
   }
 
   const deals = await prisma.deal.findMany({
@@ -91,8 +96,10 @@ export async function POST(req: NextRequest) {
   const todayCount = await prisma.deal.count({ where: { createdAt: { gte: startOfDay, lte: endOfDay } } })
   const serialNumber = `${prodCode}-${comp4}-${initials}_${dd}${mm}${yy}_${String(todayCount + 1).padStart(2, '0')}`
 
-  // A salesman's new deals are always assigned to himself
-  const effectiveAssignedToId = user.role === 'sales' ? user.id : assignedToId
+  // Only leadership (director / sales_director) may assign a deal to someone else.
+  // Every other role's new deals are always assigned to the creator himself.
+  const canAssignOthers = ['director', 'sales_director'].includes(user.role)
+  const effectiveAssignedToId = canAssignOthers ? (assignedToId || user.id) : user.id
 
   const deal = await prisma.deal.create({
     data: {
@@ -205,9 +212,11 @@ export async function POST(req: NextRequest) {
 
   // Auto-create tasks on deal creation
 
-  // 1. Company authentication task for Sales
-  const salesUser = await prisma.user.findFirst({ where: { role: 'sales' } })
-  if (salesUser) {
+  // The deal's own salesman = the assignee (never the whole sales team).
+  const dealSalesmanId = deal.assignedToId || null
+
+  // 1. Company authentication task for the deal's salesman
+  if (dealSalesmanId) {
     const authDue = new Date()
     authDue.setDate(authDue.getDate() + 2)
     await prisma.task.create({
@@ -217,7 +226,7 @@ export async function POST(req: NextRequest) {
         description: `Verify company legitimacy: check website, client list, authorized contact. GST: ${deal.gstNumber || 'not provided'}`,
         type: 'other',
         dueDate: authDue,
-        assignedToId: salesUser.id,
+        assignedToId: dealSalesmanId,
         createdById: user.id,
       }
     })
@@ -227,16 +236,21 @@ export async function POST(req: NextRequest) {
   if (tdsDeadline) {
     const tdsDate = new Date(tdsDeadline)
 
-    // TDS tasks for accounts, vp, sales
-    const tdsUsers = await prisma.user.findMany({ where: { role: { in: ['accounts', 'vp', 'sales'] } } })
-    for (const tdsUser of tdsUsers) {
+    // TDS tasks — one for the deal's own salesman, one for the accounts head, one for the VP.
+    const [accountsHead, vpUser] = await Promise.all([
+      prisma.user.findFirst({ where: { role: 'accounts' } }),
+      prisma.user.findFirst({ where: { role: 'vp' } }),
+    ])
+    const tdsAssigneeIds = Array.from(new Set([dealSalesmanId, accountsHead?.id, vpUser?.id]
+      .filter((x): x is string => !!x)))
+    for (const tdsAssigneeId of tdsAssigneeIds) {
       await prisma.task.create({
         data: {
           dealId: deal.id,
           title: `Send TDS to ${deal.customerName} — ${deal.dealNumber}`,
           dueDate: tdsDate,
           type: 'document',
-          assignedToId: tdsUser.id,
+          assignedToId: tdsAssigneeId,
           createdById: user.id,
         }
       })
@@ -287,8 +301,8 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // 4. Intro email reminder for Sales if introEmail provided
-  if (introEmail && salesUser) {
+  // 4. Intro email reminder for the deal's own salesman if introEmail provided
+  if (introEmail && dealSalesmanId) {
     const emailDue = new Date()
     emailDue.setDate(emailDue.getDate() + 1)
     await prisma.task.create({
@@ -298,7 +312,7 @@ export async function POST(req: NextRequest) {
         description: `Intro email drafted. Send it and log the email.`,
         dueDate: emailDue,
         type: 'follow_up',
-        assignedToId: salesUser.id,
+        assignedToId: dealSalesmanId,
         createdById: user.id,
       }
     })

@@ -379,6 +379,10 @@ export default function DealDetailPage() {
   // Finalize deal
   const [finalizing, setFinalizing] = useState(false)
 
+  // Transfer / reassign (leadership only)
+  const [transferTo, setTransferTo] = useState('')
+  const [transferring, setTransferring] = useState(false)
+
   // Vetting + PI
   const [submittingVetting, setSubmittingVetting] = useState(false)
   const [requestingQuoteVet, setRequestingQuoteVet] = useState(false)
@@ -524,11 +528,11 @@ export default function DealDetailPage() {
     if (!gstInput.trim()) return
     setSavingGst(true)
     await fetch(`/api/deals/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ gstNumber: gstInput }) })
-    // Auto-create reminder task for sales
-    const salesUser = users.find((u: any) => u.role === 'sales')
-    if (salesUser) {
+    // Auto-create reminder task for the deal's own salesman (never the whole sales team)
+    const gstAssignee = deal?.assignedToId || users.find((u: any) => u.role === 'sales')?.id
+    if (gstAssignee) {
       const due = new Date(); due.setDate(due.getDate() + 1)
-      await fetch('/api/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dealId: id, title: `Confirm GST number with customer — ${deal?.customerName}`, assignedToId: salesUser.id, dueDate: due.toISOString(), type: 'follow_up' }) })
+      await fetch('/api/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dealId: id, title: `Confirm GST number with customer — ${deal?.customerName}`, assignedToId: gstAssignee, dueDate: due.toISOString(), type: 'follow_up' }) })
     }
     setGstInput('')
     setSavingGst(false)
@@ -550,6 +554,15 @@ export default function DealDetailPage() {
     await fetch(`/api/deals/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dealFinalized: true }) })
     await fetchDeal()
     setFinalizing(false)
+  }
+
+  const transferDeal = async () => {
+    if (!transferTo) return
+    setTransferring(true)
+    await fetch(`/api/deals/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ assignedToId: transferTo }) })
+    setTransferTo('')
+    await fetchDeal()
+    setTransferring(false)
   }
 
   const submitForVetting = async () => {
@@ -707,6 +720,21 @@ export default function DealDetailPage() {
               <Button variant="outline" size="sm" onClick={() => setLogType('call')}><Phone className="w-3 h-3 mr-1" />Log Call</Button>
               <Button variant="outline" size="sm" onClick={() => setLogType('email')}><MailIcon className="w-3 h-3 mr-1" />Log Email</Button>
               <Button variant="outline" size="sm" onClick={() => setLogType('negotiation')}><TrendingUp className="w-3 h-3 mr-1" />Log Negotiation</Button>
+              {['director', 'sales_director'].includes(role) && (
+                <div className="flex items-center gap-1">
+                  <select
+                    value={transferTo}
+                    onChange={e => setTransferTo(e.target.value)}
+                    className="h-8 px-2 text-xs border border-gray-300 rounded-md bg-white max-w-[160px]"
+                  >
+                    <option value="">Transfer / Reassign…</option>
+                    {users.map((u: any) => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
+                  </select>
+                  <Button variant="outline" size="sm" onClick={transferDeal} disabled={!transferTo || transferring}>
+                    {transferring ? 'Assigning…' : 'Assign'}
+                  </Button>
+                </div>
+              )}
               {canFinalize && (
                 <Button variant="outline" size="sm" onClick={finalizeDeal} disabled={finalizing} className="border-emerald-300 text-emerald-700 hover:bg-emerald-50">
                   <Lock className="w-3 h-3 mr-1" />{finalizing ? 'Finalizing…' : 'Finalize & Freeze Deal'}

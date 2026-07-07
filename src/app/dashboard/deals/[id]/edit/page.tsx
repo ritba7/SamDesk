@@ -78,7 +78,7 @@ export default function EditDealPage() {
       {isFinal && (
         <div className="bg-amber-50 border border-amber-300 rounded-lg px-4 py-3">
           <p className="text-sm font-semibold text-amber-800">Final PO Data Entry — this overwrites the deal with confirmed PO details</p>
-          <p className="text-xs text-amber-700 mt-1">The earlier lead data is preserved as a pre-PO snapshot. Save each tab to apply the confirmed values.</p>
+          <p className="text-xs text-amber-700 mt-1">Re-enter all details from the confirmed PO — fields are intentionally blank for accuracy. The earlier lead data is preserved as a pre-PO snapshot. Save each tab to apply the confirmed values.</p>
         </div>
       )}
 
@@ -105,10 +105,10 @@ export default function EditDealPage() {
         <Tab1Form deal={deal} save={save} saving={saving} inputCls={inputCls} labelCls={labelCls} />
       )}
       {tab === 2 && (
-        <Tab2Form deal={deal} save={save} saving={saving} inputCls={inputCls} labelCls={labelCls} />
+        <Tab2Form deal={deal} isFinal={isFinal} save={save} saving={saving} inputCls={inputCls} labelCls={labelCls} />
       )}
       {tab === 3 && (
-        <Tab3Form deal={deal} users={users} save={save} saving={saving} inputCls={inputCls} labelCls={labelCls} fmtDate={fmtDate} />
+        <Tab3Form deal={deal} users={users} isFinal={isFinal} canAssign={['director','sales_director'].includes(user?.role)} save={save} saving={saving} inputCls={inputCls} labelCls={labelCls} fmtDate={fmtDate} />
       )}
     </div>
   )
@@ -169,38 +169,41 @@ function Tab1Form({ deal, save, saving, inputCls, labelCls }: any) {
   )
 }
 
-function Tab2Form({ deal, save, saving, inputCls, labelCls }: any) {
+function Tab2Form({ deal, isFinal, save, saving, inputCls, labelCls }: any) {
+  // On final PO entry, spec & commercial fields start EMPTY so the salesman
+  // re-enters everything manually from the confirmed PO (for accountability).
+  const src = isFinal ? {} : deal
   const [form, setForm] = useState({
-    productInterest: deal.productInterest || '',
-    querySummary: deal.querySummary || '',
-    estimatedQty: deal.estimatedQty ? String(deal.estimatedQty) : '',
-    timeline: deal.timeline || '',
-    budgetIndication: deal.budgetIndication ? String(deal.budgetIndication) : '',
-    specNotes: deal.specNotes || '',
-    material: deal.material || '',
-    motorType: deal.motorType || '',
-    motorBrand: deal.motorBrand || '',
-    motorBrandOther: deal.motorBrandOther || '',
-    outerWidth: deal.outerWidth ? String(deal.outerWidth) : '',
-    outerHeight: deal.outerHeight ? String(deal.outerHeight) : '',
-    outerDepth: deal.outerDepth ? String(deal.outerDepth) : '',
-    innerWidth: deal.innerWidth ? String(deal.innerWidth) : '',
-    innerHeight: deal.innerHeight ? String(deal.innerHeight) : '',
-    innerDepth: deal.innerDepth ? String(deal.innerDepth) : '',
-    paymentTerms: deal.paymentTerms || '',
-    freightTerms: deal.freightTerms || '',
-    inspectionTerms: deal.inspectionTerms || '',
-    freightPaidBy: deal.freightPaidBy || '',
-    modelNumber: deal.modelNumber || '',
-    airShowerConfig: deal.airShowerConfig || 'straight',
+    productInterest: src.productInterest || '',
+    querySummary: src.querySummary || '',
+    estimatedQty: src.estimatedQty ? String(src.estimatedQty) : '',
+    timeline: src.timeline || '',
+    budgetIndication: src.budgetIndication ? String(src.budgetIndication) : '',
+    specNotes: src.specNotes || '',
+    material: src.material || '',
+    motorType: src.motorType || '',
+    motorBrand: src.motorBrand || '',
+    motorBrandOther: src.motorBrandOther || '',
+    outerWidth: src.outerWidth ? String(src.outerWidth) : '',
+    outerHeight: src.outerHeight ? String(src.outerHeight) : '',
+    outerDepth: src.outerDepth ? String(src.outerDepth) : '',
+    innerWidth: src.innerWidth ? String(src.innerWidth) : '',
+    innerHeight: src.innerHeight ? String(src.innerHeight) : '',
+    innerDepth: src.innerDepth ? String(src.innerDepth) : '',
+    paymentTerms: src.paymentTerms || '',
+    freightTerms: src.freightTerms || '',
+    inspectionTerms: src.inspectionTerms || '',
+    freightPaidBy: src.freightPaidBy || '',
+    modelNumber: src.modelNumber || '',
+    airShowerConfig: src.airShowerConfig || 'straight',
     sizeCode: '', requiredDepth: '', requiredWidth: '',
-    application: deal.application || '',
-    numberOfUsers: deal.numberOfUsers ? String(deal.numberOfUsers) : '',
-    entryType: deal.entryType || '',
-    airFlowTime: deal.airFlowTime || '',
-    doorType: deal.doorType || '',
-    flooringRequired: deal.flooringRequired ? 'true' : 'false',
-    inputPower: deal.inputPower || '440V / 50Hz',
+    application: src.application || '',
+    numberOfUsers: src.numberOfUsers ? String(src.numberOfUsers) : '',
+    entryType: src.entryType || '',
+    airFlowTime: src.airFlowTime || '',
+    doorType: src.doorType || '',
+    flooringRequired: src.flooringRequired ? 'true' : 'false',
+    inputPower: src.inputPower || '440V / 50Hz',
   })
   const ch = (e: any) => setForm(f => ({ ...f, [e.target.name]: e.target.value }))
   const handleSave = () => {
@@ -340,7 +343,7 @@ function Tab2Form({ deal, save, saving, inputCls, labelCls }: any) {
   )
 }
 
-function Tab3Form({ deal, users, save, saving, inputCls, labelCls, fmtDate }: any) {
+function Tab3Form({ deal, users, canAssign, save, saving, inputCls, labelCls, fmtDate }: any) {
   const [form, setForm] = useState({
     assignedToId: deal.assignedToId || '',
     priority: deal.priority || 'medium',
@@ -365,13 +368,15 @@ function Tab3Form({ deal, users, save, saving, inputCls, labelCls, fmtDate }: an
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-5">
       <h2 className="text-base font-semibold text-gray-900">Assignment & Deadlines</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className={labelCls}>Assigned To</label>
-          <select name="assignedToId" value={form.assignedToId} onChange={ch} className={inputCls}>
-            <option value="">Unassigned</option>
-            {users.map((u: any) => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
-          </select>
-        </div>
+        {canAssign && (
+          <div>
+            <label className={labelCls}>Assigned To</label>
+            <select name="assignedToId" value={form.assignedToId} onChange={ch} className={inputCls}>
+              <option value="">Unassigned</option>
+              {users.map((u: any) => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
+            </select>
+          </div>
+        )}
         <div>
           <label className={labelCls}>Priority</label>
           <select name="priority" value={form.priority} onChange={ch} className={inputCls}>

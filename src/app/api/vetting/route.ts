@@ -8,7 +8,7 @@ export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const user = session.user as any
-  if (!['accounts', 'director'].includes(user.role)) {
+  if (!['accounts', 'sales_director', 'director'].includes(user.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const user = session.user as any
-  if (!['accounts', 'director'].includes(user.role)) {
+  if (!['accounts', 'sales_director', 'director'].includes(user.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
@@ -83,7 +83,12 @@ export async function POST(req: NextRequest) {
 
   const deal = await prisma.deal.findUnique({ where: { id: dealId } })
   if (!deal) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  if (deal.vettingStatus !== 'pending') {
+
+  // Leadership (director / sales_director) may override a prior decision.
+  // Accounts may only act on a deal that is still pending.
+  const canOverride = ['director', 'sales_director'].includes(user.role)
+  const isOverride = deal.vettingStatus !== 'pending'
+  if (isOverride && !canOverride) {
     return NextResponse.json({ error: 'Deal is not pending vetting' }, { status: 400 })
   }
 
@@ -117,7 +122,9 @@ export async function POST(req: NextRequest) {
         dealId,
         userId: user.id,
         type: 'note',
-        content: `Vetted & approved by accounts — work code ${workCode}`,
+        content: isOverride
+          ? `Vetting decision OVERRIDDEN & approved by ${user.name || user.role} (${user.role}) — work code ${workCode}`
+          : `Vetted & approved by ${user.role} — work code ${workCode}`,
         highlighted: true,
       },
     })
@@ -146,7 +153,10 @@ export async function POST(req: NextRequest) {
       dealId,
       userId: user.id,
       type: 'note',
-      content: `Vetting rejected by accounts${note ? ` — ${note}` : ''}`,
+      content: isOverride
+        ? `Vetting decision OVERRIDDEN & rejected by ${user.name || user.role} (${user.role})${note ? ` — ${note}` : ''}`
+        : `Vetting rejected by ${user.role}${note ? ` — ${note}` : ''}`,
+      highlighted: isOverride,
     },
   })
   return NextResponse.json(updated)

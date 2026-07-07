@@ -476,7 +476,7 @@ export default function AccountsPage() {
 
   const user = session?.user as any
   const role = user?.role
-  const allowed = ['director', 'accounts'].includes(role)
+  const allowed = ['director', 'accounts', 'sales_director'].includes(role)
 
   const loadData = async () => {
     const [dealsRes, expensesRes] = await Promise.all([

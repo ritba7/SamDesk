@@ -39,8 +39,14 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   if (user.role === 'sales' && deal.assignedToId !== user.id && deal.createdById !== user.id) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
-  if (user.role === 'accounts' && !deal.dealFinalized) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (user.role === 'accounts') {
+    // Accounts may see a deal once it is finalized OR submitted for any vetting.
+    const accountsVisible = deal.dealFinalized
+      || ['pending', 'approved'].includes(deal.vettingStatus)
+      || ['requested', 'vetted'].includes(deal.quoteVetStatus)
+    if (!accountsVisible) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
   }
 
   return NextResponse.json(deal)
@@ -69,6 +75,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const updateData: any = { ...rest }
   if (newStage) updateData.stage = newStage
+
+  // Reassign / transfer (assignedToId) is a leadership-only action.
+  // Strip it for anyone who is not director / sales_director.
+  const isLeadership = ['director', 'sales_director'].includes(user.role)
+  if (updateData.assignedToId !== undefined && !isLeadership) {
+    delete updateData.assignedToId
+  }
 
   // Final PO data re-entry: salesman re-enters confirmed PO details, overwriting
   // the earlier lead data. Snapshot the pre-PO data before applying the update.
@@ -233,15 +246,65 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       data: { dealId: deal.id, userId: user.id, type: 'note', content: 'Commercials updated' }
     })
   }
-  if (updateData.vettingStatus === 'pending' && existing.vettingStatus !== 'pending') {
+  // Deal transfer / reassignment (leadership only — enforced above)
+  if (updateData.assignedToId !== undefined && updateData.assignedToId !== existing.assignedToId) {
+    const newAssignee = updateData.assignedToId
+      ? await prisma.user.findUnique({ where: { id: updateData.assignedToId }, select: { name: true } })
+      : null
+    await prisma.activity.create({
+      data: {
+        dealId: deal.id,
+        userId: user.id,
+        type: 'note',
+        content: `Deal transferred to ${newAssignee?.name || 'Unassigned'}`,
+        highlighted: true,
+      },
+    })
+  }
+
+  const vettingNowPending = updateData.vettingStatus === 'pending' && existing.vettingStatus !== 'pending'
+  const quoteVetNowRequested = updateData.quoteVetStatus === 'requested' && existing.quoteVetStatus !== 'requested'
+
+  if (vettingNowPending) {
     await prisma.activity.create({
       data: { dealId: deal.id, userId: user.id, type: 'note', content: 'Submitted for accounts vetting' }
     })
   }
-  if (updateData.quoteVetStatus === 'requested' && existing.quoteVetStatus !== 'requested') {
+  if (quoteVetNowRequested) {
     await prisma.activity.create({
       data: { dealId: deal.id, userId: user.id, type: 'note', content: 'Quote vetting requested from accounts' }
     })
+  }
+
+  // Notify leadership + accounts head when a deal is submitted for any vetting.
+  if (vettingNowPending || quoteVetNowRequested) {
+    try {
+      const [accountsHead, salesDirector, directorUser] = await Promise.all([
+        prisma.user.findFirst({ where: { role: 'accounts' } }),
+        prisma.user.findFirst({ where: { role: 'sales_director' } }),
+        prisma.user.findFirst({ where: { role: 'director' } }),
+      ])
+      const recipientIds = Array.from(new Set(
+        [accountsHead?.id, salesDirector?.id, directorUser?.id].filter((x): x is string => !!x)
+      ))
+      if (recipientIds.length > 0) {
+        const due = new Date()
+        due.setDate(due.getDate() + 1)
+        const title = `Vetting requested — ${deal.customerCompany} (${deal.serialNumber || deal.dealNumber})`
+        await prisma.task.createMany({
+          data: recipientIds.map(rid => ({
+            dealId: deal.id,
+            title,
+            assignedToId: rid,
+            createdById: user.id,
+            dueDate: due,
+            type: 'other',
+          })),
+        })
+      }
+    } catch (e) {
+      // notification failure must not break the update
+    }
   }
 
   if (newStage && newStage !== existing.stage) {
@@ -299,12 +362,20 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     // Auto follow-up task based on new stage
     const followupCfg = FOLLOWUP_CONFIG.find(c => c.stage === newStage)
     if (followupCfg) {
-      // Find the best user to assign: prefer deal's assignedTo if role matches, else find first matching user
-      let assigneeId: string | null = deal.assignedToId
-      if (assigneeId) {
-        const assignee = await prisma.user.findUnique({ where: { id: assigneeId }, select: { role: true } })
-        if (!assignee || !followupCfg.assignToRole.includes(assignee.role)) {
-          assigneeId = null
+      let assigneeId: string | null = null
+      // Salesman-facing follow-ups must go to the deal's own assigned salesman —
+      // never to "the first user of role sales".
+      if (followupCfg.assignToRole.includes('sales') && deal.assignedToId) {
+        assigneeId = deal.assignedToId
+      }
+      // Otherwise prefer deal's assignedTo if its role matches, else first matching user.
+      if (!assigneeId) {
+        assigneeId = deal.assignedToId
+        if (assigneeId) {
+          const assignee = await prisma.user.findUnique({ where: { id: assigneeId }, select: { role: true } })
+          if (!assignee || !followupCfg.assignToRole.includes(assignee.role)) {
+            assigneeId = null
+          }
         }
       }
       if (!assigneeId) {

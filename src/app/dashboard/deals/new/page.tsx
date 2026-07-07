@@ -36,7 +36,9 @@ export default function NewDealPage() {
   const router = useRouter()
   const { data: session } = useSession()
   const role = (session?.user as any)?.role
-  const canAssign = ['director', 'sales_director', 'vp', 'accounts'].includes(role)
+  // Only leadership may assign a new deal to someone else. Everyone else's deal
+  // is auto-assigned to themselves server-side.
+  const canAssign = ['director', 'sales_director'].includes(role)
   const [step, setStep] = useState(1)
   const [users, setUsers] = useState<any[]>([])
   const [loading, setLoading] = useState(false)

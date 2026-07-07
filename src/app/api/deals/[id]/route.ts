@@ -135,11 +135,20 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     'warrantyTerms', 'insuranceNote', 'commercialsDone', 'paymentTerms', 'paymentSchedule',
     // Dispatch chain fields (primary path is /api/dispatch, but allow direct PATCH)
     'dispatchStatus', 'dispatchDate', 'packingListNote',
+    // Freeze / final-entry flags — sales freeze action must go through
+    'dealFinalized', 'finalDataEntered',
   ]
+
+  // A salesman may set dealFinalized true (freeze) but never un-freeze it back.
+  if (user.role === 'sales' && updateData.dealFinalized === false && existing.dealFinalized) {
+    delete updateData.dealFinalized
+  }
 
   // Sales fill-blanks-only rule: a salesman may fill in blank fields but may
   // not overwrite existing details. Fields in ALWAYS_EDITABLE (stage,
-  // follow-ups, commercials, dispatch, etc.) are exempt so those flows work.
+  // follow-ups, commercials, dispatch, freeze flags, etc.) are exempt so those
+  // flows work. Note: booleans default to false, so exempting the freeze flags
+  // is required — otherwise a false→true toggle would be wrongly stripped.
   if (user.role === 'sales' && !isFinalEntry) {
     for (const key of Object.keys(updateData)) {
       if (ALWAYS_EDITABLE.includes(key)) continue

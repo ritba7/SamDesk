@@ -580,6 +580,14 @@ export default function DealDetailPage() {
     setRequestingQuoteVet(false)
   }
 
+  const vetAction = async (action: 'approve' | 'reject') => {
+    let note: string | undefined
+    if (action === 'reject') { note = window.prompt('Reason for rejection (optional):') || undefined }
+    else if (!window.confirm('Approve this deal? This assigns a work code and advances it past vetting.')) return
+    await fetch('/api/vetting', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dealId: id, action, note }) })
+    await fetchDeal()
+  }
+
   const createPI = async () => {
     if (!piForm.amount) return
     setPiSaving(true)
@@ -640,6 +648,98 @@ export default function DealDetailPage() {
   const canSeeChangeHistory = role === 'director' || role === 'sales_director'
   const woNumber = deal.workOrders?.[0]?.woNumber
   const pageTitle = role === 'manufacturing' ? (woNumber || deal.customerCompany) : deal.customerCompany
+
+  // ===== Restricted ACCOUNTS view: only technicals, commercials, delivery deadlines & vetting =====
+  if (role === 'accounts') {
+    const disc = deal.discountType === 'percent'
+      ? (deal.basicPrice && deal.discountValue ? deal.basicPrice * deal.discountValue / 100 : 0)
+      : (deal.discountValue || 0)
+    const finalP = deal.finalPrice ?? (deal.basicPrice ? deal.basicPrice - disc : deal.quotedAmount)
+    const gst = finalP ? finalP * 0.18 : 0
+    const Row = ({ l, v }: { l: string, v: any }) => (v || v === 0) ? (
+      <div className="flex justify-between text-sm py-1 border-b border-gray-50"><span className="text-gray-500">{l}</span><span className="text-gray-900 text-right font-medium">{v}</span></div>
+    ) : null
+    return (
+      <div className="space-y-5 max-w-4xl mx-auto">
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-3">
+            <Link href="/dashboard/deals"><Button variant="ghost" size="icon"><ArrowLeft className="w-4 h-4" /></Button></Link>
+            <div>
+              <h1 className="text-xl font-bold text-gray-900 font-mono">{deal.workCode || deal.serialNumber || deal.dealNumber}</h1>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getStageColor(deal.stage)}`}>{getStageLabel(deal.stage)}</span>
+                {deal.vettingStatus === 'approved' && <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">Vetted ✓ {deal.workCode}</span>}
+                {deal.vettingStatus === 'pending' && <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Vetting Pending</span>}
+                {deal.vettingStatus === 'rejected' && <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700">Rejected</span>}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Vetting options */}
+        {(deal.vettingStatus === 'pending' || deal.vettingStatus === 'approved' || deal.vettingStatus === 'rejected') && (
+          <Card>
+            <CardHeader><CardTitle className="text-sm flex items-center gap-2"><ShieldCheck className="w-4 h-4" /> Vetting</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              {deal.vettingNote && <p className="text-sm text-gray-600">Note: {deal.vettingNote}</p>}
+              <div className="flex gap-2">
+                {deal.vettingStatus !== 'approved' && <Button size="sm" onClick={() => vetAction('approve')} className="bg-green-600 hover:bg-green-700"><Check className="w-3 h-3 mr-1" />Approve & Assign Work Code</Button>}
+                {deal.vettingStatus !== 'rejected' && <Button size="sm" variant="destructive" onClick={() => vetAction('reject')}>Reject</Button>}
+                {canGenerateWo && <Button size="sm" variant="outline" onClick={generateWorkOrder}><ClipboardList className="w-3 h-3 mr-1" />Generate WO</Button>}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {/* Technicals */}
+          <Card>
+            <CardHeader><CardTitle className="text-sm">Technical Specifications</CardTitle></CardHeader>
+            <CardContent className="space-y-0.5">
+              <Row l="Model" v={deal.modelNumber} />
+              <Row l="Configuration" v={deal.airShowerConfig} />
+              <Row l="Material" v={deal.material?.toUpperCase?.()} />
+              <Row l="Application" v={deal.application} />
+              <Row l="Users / Cycle" v={deal.numberOfUsers} />
+              <Row l="Motor" v={deal.motorType ? `${deal.motorType.toUpperCase()}${deal.motorBrand ? ' — ' + deal.motorBrand : ''}` : null} />
+              <Row l="Door" v={deal.doorType} />
+              <Row l="Flooring" v={deal.flooringType} />
+              <Row l="Outer (W×D×H)" v={deal.outerWidth ? `${deal.outerWidth}×${deal.outerDepth}×${deal.outerHeight} mm` : null} />
+              <Row l="Inner (W×D×H)" v={deal.innerWidth ? `${deal.innerWidth}×${deal.innerDepth}×${deal.innerHeight} mm` : null} />
+              <Row l="Spec Notes" v={deal.specNotes} />
+            </CardContent>
+          </Card>
+
+          {/* Commercials */}
+          <Card>
+            <CardHeader><CardTitle className="text-sm">Commercials</CardTitle></CardHeader>
+            <CardContent className="space-y-0.5">
+              <Row l="Basic Price" v={deal.basicPrice ? formatCurrency(deal.basicPrice) : null} />
+              <Row l="Discount" v={disc ? `${deal.discountType === 'percent' ? deal.discountValue + '%' : ''} (${formatCurrency(disc)})` : null} />
+              <Row l="Final Price" v={finalP ? formatCurrency(finalP) : null} />
+              <Row l="GST (18%)" v={finalP ? formatCurrency(gst) : null} />
+              <Row l="Grand Total" v={finalP ? formatCurrency(finalP + gst) : null} />
+              <Row l="Payment Terms" v={deal.paymentTerms} />
+              <Row l="Freight" v={deal.freightBearer?.replace(/_/g, ' ')} />
+              <Row l="Assembly" v={deal.assemblyAtSite?.replace(/_/g, ' ')} />
+              <Row l="Warranty" v={deal.warrantyTerms} />
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Delivery deadlines */}
+        <Card>
+          <CardHeader><CardTitle className="text-sm">Delivery Deadlines</CardTitle></CardHeader>
+          <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div><p className="text-xs text-gray-500">TDS Deadline</p><p className="font-medium">{deal.tdsDeadline ? formatDate(deal.tdsDeadline) : '—'}</p></div>
+            <div><p className="text-xs text-gray-500">Expected Dispatch</p><p className="font-medium">{deal.expectedDispatch ? formatDate(deal.expectedDispatch) : '—'}</p></div>
+            <div><p className="text-xs text-gray-500">Advance Due</p><p className="font-medium">{deal.advanceDeadline ? formatDate(deal.advanceDeadline) : '—'}</p></div>
+            <div><p className="text-xs text-gray-500">Balance Due</p><p className="font-medium">{deal.balanceDeadline ? formatDate(deal.balanceDeadline) : '—'}</p></div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
